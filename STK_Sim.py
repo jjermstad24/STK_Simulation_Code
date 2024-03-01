@@ -31,14 +31,15 @@ class STK_Simulation:
         self.scenario = self.root.NewScenario(Filename)
 
     def Target_Loader(self,Filename):
-        print("Loading Targets...")
+        print("Loading Targets",end='\r')
         self.targets = {}
         for i in self.root.CurrentScenario.Children.GetElements(AgESTKObjectType.eTarget):
             i.Unload()
 
-        data = pd.read_csv(Filename,delimiter=' ')
+        data = pd.read_csv(Filename,delimiter=',')
 
         for i in range(len(data)):
+            print(f'Loading Target{i+1}',end='\r')
             self.targets[f'Target{i+1}'] = self.root.CurrentScenario.Children.New(AgESTKObjectType.eTarget, f'Target{i+1}')
             # IAgFacility target: Target Object
             self.targets[f'Target{i+1}'].Position.AssignGeodetic(float(data['Lat'][i]), float(data['Lon'][i]), float(data['Alt'][i]))  # Latitude, Longitude, Altitude
@@ -46,17 +47,19 @@ class STK_Simulation:
             self.targets[f'Target{i+1}'].UseTerrain = True
             # Set altitude to a distance above the ground
             self.targets[f'Target{i+1}'].HeightAboveGround = 0   # km
+        print("Loaded Targets")
             
-    def Satellite_Loader(self,Filename):
-        print("Loading Satellites...")
+    def Satellite_Loader(self,Filename,External_Pointing_File=False):
+        print("Loading Satellites",end='\r')
         self.satellites = {}
         self.sensors = {}
         for i in self.root.CurrentScenario.Children.GetElements(AgESTKObjectType.eSatellite):
             i.Unload()
 
-        data = pd.read_csv(Filename,delimiter=' ')
+        data = pd.read_csv(Filename,delimiter=',')
 
         for i in range(len(data)):
+            print(f'Loading Satellite{i+1}',end='\r')
             self.satellites[f'Satellite{i+1}'] = self.root.CurrentScenario.Children.New(AgESTKObjectType.eSatellite, f'Satellite{i+1}')
 
             # IAgSatellite satellite: Satellite object
@@ -82,15 +85,20 @@ class STK_Simulation:
             # IAgSatellite satellite: Satellite object
             self.sensors[f'Satellite{i+1}'] = self.satellites[f'Satellite{i+1}'].Children.New(AgESTKObjectType.eSensor, f'Sensor{i+1}')
             self.sensors[f'Satellite{i+1}'].CommonTasks.SetPatternSimpleConic(5.0,0.1)
-            if data['Tar'][i]:
+            if External_Pointing_File:
+                self.sensors[f'Satellite{i+1}'].SetPointingExternalFile(External_Pointing_File)
+            elif data['Tar'][i]:
                 self.sensors[f'Satellite{i+1}'].SetPointingType(5)
                 for j in self.targets:
                     self.sensors[f'Satellite{i+1}'].Pointing.Targets.Add(f'*/Target/{j}')
+        print(f'Loaded Satellites')
 
     def Compute_AzEl(self,dt):
-        print("Computing AzEl")
+        print("Computing AzEl",end='\r')
         self.AzEl_data = {}
+        self.Azimuth_vs_Elevation = {}
         for j in self.targets:
+            self.Azimuth_vs_Elevation[j] = np.zeros([9,18])
             print(f'{j}...',end='\r')
             for i in self.satellites:
                 access = self.targets[j].GetAccessToObject(self.sensors[i])
@@ -109,22 +117,15 @@ class STK_Simulation:
                         data_array[k,2] = float(data_array[k,2])
                     df = pd.DataFrame({'Time':data_array[:,0],'Elevation':data_array[:,1],'Azimuth':data_array[:,2]})
                     self.AzEl_data[f'{j}->{i}'] = df
-
-    def Plot(self,dt):
-        fig = make_subplots()
-        lat = []
-        lon = []
-        for i in self.targets:
-            lon,lat = self.targets[i].DataProviders.Item('All Position').ExecElements(['Geodetic-Lat','Geodetic-Lon']).DataSets.ToArray()[0]
-            fig.add_trace(go.Scattergeo(lat=[lat],lon=[lon],name=i))
-        for i in self.satellites:
-            data_array = np.array(self.satellites[i].DataProviders.GetItemByName('Mixed Spherical Elements').Group.Item('ICRF').ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,dt,['Time','Detic Lat','Detic Lon']).DataSets.ToArray())
-            fig.add_trace(go.Scattergeo(lat=data_array[:,1],lon=data_array[:,2],opacity=.05))
-        fig.update_layout(showlegend=False)
-        return fig
+                    y=np.linspace(0,180,19)
+                    self.Azimuth_vs_Elevation[j]+=np.histogram2d(df['Azimuth'].astype(float),df['Elevation'].astype(float), bins=y, density=False)[0].tolist()[0:9]
+            self.Azimuth_vs_Elevation[j] = pd.DataFrame(self.Azimuth_vs_Elevation[j])
+            self.Azimuth_vs_Elevation[j].columns = [f"{i*10}-{(i+1)*10}" for i in range(0,18)]
+            self.Azimuth_vs_Elevation[j].index = [f"{i*10}-{(i+1)*10}" for i in range(0,9)]
+        print("Computed AzEl")
     
     def Compute_Lifetime(self,Cd=2.2,Cr=1.0,DragArea=13.65,SunArea=15.43,Mass=1000.0):
-        print("Computing Lifetimes...")
+        print("Computing Lifetimes",end='\r')
         labels=['SAT##','Orbits','Time']
         table = []
         for i in self.satellites:
@@ -151,3 +152,4 @@ class STK_Simulation:
                 table.append([i[i.find('satellites'):],orbits,str(years)+' '+str(time_unit)])
         self.Lifetimes = pd.DataFrame(table,columns=labels)
         self.Lifetimes.set_index('SAT##',inplace=True)
+        print("Computed Lifetimes")
