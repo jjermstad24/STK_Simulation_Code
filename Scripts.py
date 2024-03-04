@@ -6,6 +6,7 @@ import datetime
 from faker import Faker
 from shapely.geometry import Polygon, Point
 import plotly.graph_objects as go
+import plotly.express as px
 
 def Random_Decimal(t):
     lower,upper = t
