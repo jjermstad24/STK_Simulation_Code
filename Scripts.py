@@ -7,6 +7,12 @@ from faker import Faker
 from shapely.geometry import Polygon, Point
 import plotly.graph_objects as go
 import plotly.express as px
+import os, sys
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import QUrl
+from PyQt5 import QtWebEngineWidgets
+import plotly.offline
+
 
 def Random_Decimal(t):
     lower,upper = t
@@ -86,3 +92,21 @@ def Pointing_File_Generator(filename,period):
         f.write(f'{period/162*(i+1)} {(i%9+1)*10-5} {(i//9+1)*10-5}\n')
     f.write('End Attitude')
     f.close()
+class PlotlyViewer(QtWebEngineWidgets.QWebEngineView):
+    def __init__(self, fig, exec=True):
+        # Create a QApplication instance or use the existing one if it exists
+        self.app = QApplication.instance() if QApplication.instance() else QApplication(sys.argv)
+
+        super().__init__()
+
+        self.file_path = os.path.abspath(os.path.join(".", "temp.html"))
+        plotly.offline.plot(fig, filename=self.file_path, auto_open=False)
+        self.load(QUrl.fromLocalFile(self.file_path))
+        self.setWindowTitle("Plotly Viewer")
+        self.show()
+
+        if exec:
+            self.app.exec_()
+
+    def closeEvent(self, event):
+        os.remove(self.file_path)
