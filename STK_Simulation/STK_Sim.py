@@ -78,14 +78,14 @@ class STK_Simulation:
             self.satellites[f'Satellite{i+1}'].Propagator.Propagate()
 
             # IAgSatellite satellite: Satellite object
-            self.sensors[f'Satellite{i+1}'] = self.satellites[f'Satellite{i+1}'].Children.New(AgESTKObjectType.eSensor, f'Sensor{i+1}')
-            self.sensors[f'Satellite{i+1}'].CommonTasks.SetPatternSAR(0,90,40,30,data['Per'][i])
-            if External_Pointing_File:
-                self.sensors[f'Satellite{i+1}'].SetPointingExternalFile(External_Pointing_File)
-            elif data['Tar'][i]:
-                self.sensors[f'Satellite{i+1}'].SetPointingType(5)
-                for j in self.targets:
-                    self.sensors[f'Satellite{i+1}'].Pointing.Targets.Add(f'*/Target/{j}')
+            # self.sensors[f'Satellite{i+1}'] = self.satellites[f'Satellite{i+1}'].Children.New(AgESTKObjectType.eSensor, f'Sensor{i+1}')
+            # self.sensors[f'Satellite{i+1}'].CommonTasks.SetPatternSAR(0,90,0,0,data['Per'][i])
+            # if External_Pointing_File:
+            #     self.sensors[f'Satellite{i+1}'].SetPointingExternalFile(External_Pointing_File)
+            # elif data['Tar'][i]:
+            #     self.sensors[f'Satellite{i+1}'].SetPointingType(5)
+            #     for j in self.targets:
+            #         self.sensors[f'Satellite{i+1}'].Pointing.Targets.Add(f'*/Target/{j}')
 
     def Compute_AzEl(self,dt):
         self.AzEl_data = {}
@@ -94,7 +94,7 @@ class STK_Simulation:
             for j in self.targets:
                 self.Azimuth_vs_Elevation[j] = np.zeros([36,9])
                 for i in self.satellites:
-                    access = self.targets[j].GetAccessToObject(self.sensors[i])
+                    access = self.targets[j].GetAccessToObject(self.satellites[i])
                     access.ComputeAccess()
                     DP = access.DataProviders.GetItemByName('AER Data').Group.Item(0).ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,dt,['Time','Elevation','Azimuth'])
                     data = np.array(DP.DataSets.ToArray())
@@ -122,7 +122,7 @@ class STK_Simulation:
         with alive_bar(len(self.targets),force_tty=True,bar='classic') as bar:
             for t in self.targets:
                 dfs = []
-                for s in self.sensors:
+                for s in self.satellites:
                     if type(data[f'{t}->{s}']) != int:
                         dfs.append(data[f'{t}->{s}'])
                 if len(dfs) > 0:
