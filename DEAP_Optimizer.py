@@ -65,6 +65,33 @@ toolbox.register("satellite", tools.initCycle, creator.Satellite,
                   toolbox.attr_asc,
                   toolbox.attr_loc), n=n_sats)
 
+def satellite_cost(Individual):
+    file = open("Input_Files/Satellites_File.txt","w")
+    file.write("Per,Apo,Inc,AoP,Asc,Loc,Tar,Aft\n")
+    nvars = 5
+    for n in range(len(Individual)//nvars):
+        Alt = Individual[nvars*n]
+        Inc = Individual[nvars*n+1]
+        AoP = Individual[nvars*n+2]
+        Asc = Individual[nvars*n+3]
+        Loc = Individual[nvars*n+4]
+        Tar = 1
+        file.write(f"{Alt},{Alt},{Inc},{AoP},{Asc},{Loc},{Tar}\n")
+    file.close()
+    satellites_filename = 'Input_Files/Satellites_File.txt'
+    stk_object.Satellite_Loader(satellites_filename)
+    stk_object.Compute_AzEl(dt)
+    num_total_angles = 0
+    for t in range(len(stk_object.targets)):
+        num_total_angles += len(np.where(stk_object.Azimuth_vs_Elevation[f"Target{t+1}"]>0)[0])
+    stk_object.Compute_Time_Sorted_Data()
+    times = []
+    for tar in stk_object.targets:
+        df = stk_object.time_sorted_data[tar]
+        index = df['Percent Imaged'].values==df['Percent Imaged'].values[-1]
+        times.append(df['Time'].values[index][0])
+    return 100*num_total_angles/324/len(stk_object.targets),max(times),len(Individual)//nvars
+
 # Registering tools for the algorithm
 toolbox.register("population", tools.initRepeat, list, toolbox.satellite)
 toolbox.register("evaluate", satellite_cost)
