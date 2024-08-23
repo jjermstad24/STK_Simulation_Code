@@ -87,12 +87,8 @@ class STK_Simulation:
 
     def Compute_AzEl(self,dt):
         self.AzEl_data = {}
-        self.Azimuth_vs_Elevation = {}
-        x=np.arange(0,91,10)
-        y=np.arange(0,361,10)
         with alive_bar(len(self.targets),force_tty=True,bar='classic',title='Computing_AzEl') as bar:
             for j in self.targets:
-                self.Azimuth_vs_Elevation[j] = np.zeros([36,9])
                 for i in self.satellites:
                     access = self.targets[j].GetAccessToObject(self.satellites[i])
                     access.ComputeAccess()
@@ -106,37 +102,75 @@ class STK_Simulation:
                         data_array = np.array([v for v in data_array if not(None in v)])
                         df = pd.DataFrame({'Time':data_array[:,0],'Azimuth':data_array[:,1],'Elevation':data_array[:,2]})
                         self.AzEl_data[f'{j}->{i}'] = df
-                        self.Azimuth_vs_Elevation[j]+=np.histogram2d(np.abs(df['Azimuth'].astype(float)),np.abs(df['Elevation'].astype(float)), bins=[y,x], density=False)[0]
                     else:
                         self.AzEl_data[f'{j}->{i}'] = 0
-                self.Azimuth_vs_Elevation[j] = pd.DataFrame(self.Azimuth_vs_Elevation[j])
-                self.Azimuth_vs_Elevation[j].columns = [f"{i*10}-{(i+1)*10}" for i in range(0,9)]
-                self.Azimuth_vs_Elevation[j].index = [f"{i*10}-{(i+1)*10}" for i in range(0,36)]
                 bar()
-    
-    def Compute_Time_Sorted_Data(self):
+
+    def Sort_AzEl_hist_per_target(self):
+        self.AzEl_hist_per_target = {}
+        x=np.arange(0,91,10)
+        y=np.arange(0,361,10)
+        with alive_bar(len(self.targets),force_tty=True,bar='classic',title='Sorting_AzEl_hist_per_target') as bar:
+            for j in self.targets:
+                self.AzEl_hist_per_target[j] = np.zeros([36,9])
+                for i in self.satellites:
+                    df = self.AzEl_data[f'{j}->{i}']
+                    if type(df) != int:
+                        self.AzEl_hist_per_target[j]+=np.histogram2d(np.abs(df['Azimuth'].astype(float)),np.abs(df['Elevation'].astype(float)), bins=[y,x], density=False)[0]
+                self.AzEl_hist_per_target[j] = pd.DataFrame(self.AzEl_hist_per_target[j])
+                self.AzEl_hist_per_target[j].columns = [f"{i*10}-{(i+1)*10}" for i in range(0,9)]
+                self.AzEl_hist_per_target[j].index = [f"{i*10}-{(i+1)*10}" for i in range(0,36)]
+                bar()
+
+    def Sort_AzEl_4d_representation(self):
+        self.AzEl_4d_representation = {}
+        x=np.arange(0,91,10)
+        y=np.arange(0,361,10)
+        with alive_bar(len(self.satellites),force_tty=True,bar='classic',title='Sorting_AzEl_4d_representation') as bar:
+            df = {'Time':[],'Satellite':[],'Target':[],'Bin':[]}
+            for sat in self.satellites:
+                for tar in self.targets:
+                    target_df = self.AzEl_data[f'{tar}->{sat}']
+                    if type(target_df)!=int:
+                        for idx in range(len(target_df)):
+                            df['Time'].append(target_df['Time'].values[idx])
+                            df['Satellite'].append(int(sat.strip("Satellite")))
+                            df['Target'].append(int(tar.strip("Target")))
+                            Az = np.abs(target_df['Azimuth'].values[idx])
+                            El = np.abs(target_df['Elevation'].values[idx])
+                            r,c = np.where(np.histogram2d([Az],[El], bins=[y,x], density=False)[0]==1)
+                            r = r[0];c = c[0]
+                            df['Bin'].append(r*9+c)
+                bar()
+        df = pd.DataFrame(df)
+        df = df.sort_values('Time')
+        self.AzEl_4d_representation = df
+
+
+
+    def Sort_AzEl_time_per_target(self):
         data = self.AzEl_data
-        self.time_sorted_data = {}
-        with alive_bar(len(self.targets),force_tty=True,bar='classic',title='Computing_Time_Sorted_Data') as bar:
+        self.AzEl_time_per_target = {}
+        with alive_bar(len(self.targets),force_tty=True,bar='classic',title='Sorting_AzEl_time_per_target') as bar:
             for t in self.targets:
                 dfs = []
                 for s in self.satellites:
                     if type(data[f'{t}->{s}']) != int:
                         dfs.append(data[f'{t}->{s}'])
                 if len(dfs) > 0:
-                    time_sorted_data = pd.concat(dfs).sort_values(by="Time",ignore_index=True)
+                    AzEl_time_per_target = pd.concat(dfs).sort_values(by="Time",ignore_index=True)
                     img_percent = []
                     Target_Angles = np.zeros([36,9])
-                    for idx,time in enumerate(time_sorted_data['Time']):
-                        Az = time_sorted_data['Azimuth'][idx]
-                        El = time_sorted_data['Elevation'][idx]
+                    for idx,time in enumerate(AzEl_time_per_target['Time']):
+                        Az = AzEl_time_per_target['Azimuth'][idx]
+                        El = AzEl_time_per_target['Elevation'][idx]
                         Target_Angles[int(Az//10),int(El//10)] += 1
                         num_total_angles = len(np.where(Target_Angles>0)[0])
                         img_percent.append((100*num_total_angles/324))
-                    time_sorted_data['Percent Imaged'] = img_percent
-                    self.time_sorted_data[t] = time_sorted_data
+                    AzEl_time_per_target['Percent Imaged'] = img_percent
+                    self.AzEl_time_per_target[t] = AzEl_time_per_target
                 else:
-                    self.time_sorted_data[t] = 0
+                    self.AzEl_time_per_target[t] = 0
                 bar()
     
     def Compute_YPR_rates(self,dt):
