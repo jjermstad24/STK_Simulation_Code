@@ -90,7 +90,7 @@ class STK_Simulation:
         self.Azimuth_vs_Elevation = {}
         x=np.arange(0,91,10)
         y=np.arange(0,361,10)
-        with alive_bar(len(self.targets),force_tty=True,bar='classic') as bar:
+        with alive_bar(len(self.targets),force_tty=True,bar='classic',title='Computing_AzEl') as bar:
             for j in self.targets:
                 self.Azimuth_vs_Elevation[j] = np.zeros([36,9])
                 for i in self.satellites:
@@ -117,7 +117,7 @@ class STK_Simulation:
     def Compute_Time_Sorted_Data(self):
         data = self.AzEl_data
         self.time_sorted_data = {}
-        with alive_bar(len(self.targets),force_tty=True,bar='classic') as bar:
+        with alive_bar(len(self.targets),force_tty=True,bar='classic',title='Computing_Time_Sorted_Data') as bar:
             for t in self.targets:
                 dfs = []
                 for s in self.satellites:
