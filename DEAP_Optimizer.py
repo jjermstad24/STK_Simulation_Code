@@ -3,7 +3,6 @@ from IPython.display import clear_output
 from deap import base
 from deap import creator
 from deap import tools
-from FUNCTIONS.cost_functions import satellite_cost
 
 from STK_Sim import *
 
