@@ -29,6 +29,7 @@ class STK_Simulation:
             self.root = self.stk.NewObjectRoot()
         #Creating a new scenario
         self.scenario = self.root.NewScenario(Filename)
+        self.dt = 60
 
     def Target_Loader(self,Filename):
         self.targets = {}
@@ -85,127 +86,78 @@ class STK_Simulation:
             # for j in self.targets:
             #     self.sensors[f'Satellite{i+1}'].Pointing.Targets.Add(f'*/Target/{j}')
 
-    def Compute_AzEl(self,dt):
-        self.AzEl_data = {}
-        with alive_bar(len(self.targets),force_tty=True,bar='classic',title='Computing_AzEl') as bar:
-            for j in self.targets:
-                for i in self.satellites:
-                    access = self.targets[j].GetAccessToObject(self.satellites[i])
+    def Compute_AzEl(self):
+        df = {'Time':[],'Satellite':[],'Target':[],'Azimuth':[],'Elevation':[],'Group':[]}
+        with alive_bar(len(self.targets),force_tty=True,bar='classic',title='1. Computing_AzEl',length=10) as bar:
+            for tar_num,tar in enumerate(self.targets):
+                for sat_num,sat in enumerate(self.satellites):
+                    access = self.targets[tar].GetAccessToObject(self.satellites[sat])
                     access.ComputeAccess()
-                    DP = access.DataProviders.GetItemByName('AER Data').Group.Item(0).ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,dt,['Time','Elevation','Azimuth'])
-                    data = np.array(DP.DataSets.ToArray())
-                    data_list=[]
-                    if len(data) > 0:
-                        for k in range(np.shape(data)[1]//3):
-                            data_list.append(np.array(data[0:,k*3:(k+1)*3]))
-                        data_array = list(np.vstack(tuple(data_list)))
-                        data_array = np.array([v for v in data_array if not(None in v)])
-                        df = pd.DataFrame({'Time':data_array[:,0],'Azimuth':data_array[:,1],'Elevation':data_array[:,2]})
-                        self.AzEl_data[f'{j}->{i}'] = df
-                    else:
-                        self.AzEl_data[f'{j}->{i}'] = 0
+                    data = access.DataProviders.GetItemByName('AER Data').Group.Item(0).ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt,['Time','Azimuth','Elevation']).DataSets.ToArray()
+                    for i in range(len(data)):
+                        for j in range(0,len(data[i]),3):
+                            data[i].insert(j+3+j//3,j//3+1)
+                    data = np.array(data).ravel()
+                    time = data[0::4]
+                    az = data[1::4]
+                    el = data[2::4]
+                    group = data[3::4]
+                    for idx in range(len(time)):
+                        if time[idx] != None:
+                            df['Time'].append(time[idx])
+                            df['Satellite'].append(sat_num+1)
+                            df['Target'].append(tar_num+1)
+                            df['Azimuth'].append(np.abs(az[idx]))
+                            df['Elevation'].append(np.abs(el[idx]))
+                            df['Group'].append(group[idx])
                 bar()
+        self.AzEl_data = pd.DataFrame(df).sort_values('Time')
+        return 0
 
-    def Sort_AzEl_hist_per_target(self):
-        self.AzEl_hist_per_target = {}
-        x=np.arange(0,91,10)
-        y=np.arange(0,361,10)
-        with alive_bar(len(self.targets),force_tty=True,bar='classic',title='Sorting_AzEl_hist_per_target') as bar:
-            for j in self.targets:
-                self.AzEl_hist_per_target[j] = np.zeros([36,9])
-                for i in self.satellites:
-                    df = self.AzEl_data[f'{j}->{i}']
-                    if type(df) != int:
-                        self.AzEl_hist_per_target[j]+=np.histogram2d(np.abs(df['Azimuth'].astype(float)),np.abs(df['Elevation'].astype(float)), bins=[y,x], density=False)[0]
-                self.AzEl_hist_per_target[j] = pd.DataFrame(self.AzEl_hist_per_target[j])
-                self.AzEl_hist_per_target[j].columns = [f"{i*10}-{(i+1)*10}" for i in range(0,9)]
-                self.AzEl_hist_per_target[j].index = [f"{i*10}-{(i+1)*10}" for i in range(0,36)]
-                bar()
-
-    def Sort_AzEl_4d_representation(self):
+    def Sort_AzEl(self):
         self.AzEl_4d_representation = {}
-        x=np.arange(0,91,10)
-        y=np.arange(0,361,10)
-        with alive_bar(len(self.satellites),force_tty=True,bar='classic',title='Sorting_AzEl_4d_representation') as bar:
-            df = {'Time':[],'Satellite':[],'Target':[],'Bin':[]}
-            for sat in self.satellites:
-                for tar in self.targets:
-                    target_df = self.AzEl_data[f'{tar}->{sat}']
-                    if type(target_df)!=int:
-                        for idx in range(len(target_df)):
-                            df['Time'].append(target_df['Time'].values[idx])
-                            df['Satellite'].append(int(sat.strip("Satellite")))
-                            df['Target'].append(int(tar.strip("Target")))
-                            Az = np.abs(target_df['Azimuth'].values[idx])
-                            El = np.abs(target_df['Elevation'].values[idx])
-                            r,c = np.where(np.histogram2d([Az],[El], bins=[y,x], density=False)[0]==1)
-                            r = r[0];c = c[0]
-                            df['Bin'].append(r*9+c)
+        self.Targets_Point_Bins = {}
+        for tar in self.targets:
+            self.Targets_Point_Bins[tar] = np.zeros([36,9])
+        df = {'Time':[],'Satellite':[],'Target':[],'Bin':[],'Point':[],'Target Percentage':[]}
+        with alive_bar(len(self.AzEl_data),force_tty=True,bar='classic',title='2. Sorting_AzEl  ',length=10) as bar:
+            for idx in range(len(self.AzEl_data)):
+                df['Time'].append(self.AzEl_data['Time'].values[idx])
+                df['Satellite'].append(self.AzEl_data['Satellite'].values[idx])
+                df['Target'].append(self.AzEl_data['Target'].values[idx])
+                r,c = int(self.AzEl_data['Azimuth'].values[idx]//10),int(self.AzEl_data['Elevation'].values[idx]//10)
+                df['Bin'].append(r*9+c)
+                tar = f"Target{self.AzEl_data['Target'].values[idx]}"
+                df['Point'].append(1/((self.Targets_Point_Bins[tar][r,c]+1)*(self.Targets_Point_Bins[tar][r,c]+1)))
+                self.Targets_Point_Bins[tar][r,c] += df['Point'][-1]
+                df['Target Percentage'].append(100*np.count_nonzero(self.Targets_Point_Bins[tar])/324)
                 bar()
-        df = pd.DataFrame(df)
-        df = df.sort_values('Time')
-        self.AzEl_4d_representation = df
-
-
-
-    def Sort_AzEl_time_per_target(self):
-        data = self.AzEl_data
-        self.AzEl_time_per_target = {}
-        with alive_bar(len(self.targets),force_tty=True,bar='classic',title='Sorting_AzEl_time_per_target') as bar:
-            for t in self.targets:
-                dfs = []
-                for s in self.satellites:
-                    if type(data[f'{t}->{s}']) != int:
-                        dfs.append(data[f'{t}->{s}'])
-                if len(dfs) > 0:
-                    AzEl_time_per_target = pd.concat(dfs).sort_values(by="Time",ignore_index=True)
-                    img_percent = []
-                    Target_Angles = np.zeros([36,9])
-                    for idx,time in enumerate(AzEl_time_per_target['Time']):
-                        Az = AzEl_time_per_target['Azimuth'][idx]
-                        El = AzEl_time_per_target['Elevation'][idx]
-                        Target_Angles[int(Az//10),int(El//10)] += 1
-                        num_total_angles = len(np.where(Target_Angles>0)[0])
-                        img_percent.append((100*num_total_angles/324))
-                    AzEl_time_per_target['Percent Imaged'] = img_percent
-                    self.AzEl_time_per_target[t] = AzEl_time_per_target
-                else:
-                    self.AzEl_time_per_target[t] = 0
-                bar()
+        self.AzEl_4d_representation = pd.DataFrame(df)
+        return 0
     
-    def Compute_YPR_rates(self,dt):
-        self.YPR_rates_data = {}
-        for j in self.sensors:
-            DP = self.sensors[j].DataProviders.GetItemByName('Body Axes Orientation').Group.Item(4).ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,dt,['Time','YPR321 yaw rate','YPR321 pitch rate','YPR321 roll rate'])
-            data = np.array(DP.DataSets.ToArray())
-            data_list=[]
-            if len(data) > 0:
-                for k in range(np.shape(data)[1]//4):
-                    data_list.append(np.array(data[0:,k*4:(k+1)*4]))
-                data_array = list(np.vstack(tuple(data_list)))
-                data_array = np.array([v for v in data_array if not(None in v)])
-                df = pd.DataFrame({'Time':data_array[:,0],'yaw rate':data_array[:,1],'pitch rate':data_array[:,2],'roll rate':data_array[:,3]})
-                df['yaw rate'] = df['yaw rate'].astype(float)
-                df['pitch rate'] = df['pitch rate'].astype(float)
-                df['roll rate'] = df['roll rate'].astype(float)
-                self.YPR_rates_data[f'{j}'] = df
-
-    def Compute_YPR(self,dt):
-        self.YPR_data = {}
-        for j in self.sensors:
-            DP = self.sensors[j].DataProviders.GetItemByName('Body Axes Orientation').Group.Item(4).ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,dt,['Time','YPR321 yaw','YPR321 pitch','YPR321 roll'])
-            data = np.array(DP.DataSets.ToArray())
-            data_list=[]
-            if len(data) > 0:
-                for k in range(np.shape(data)[1]//4):
-                    data_list.append(np.array(data[0:,k*4:(k+1)*4]))
-                data_array = list(np.vstack(tuple(data_list)))
-                data_array = np.array([v for v in data_array if not(None in v)])
-                df = pd.DataFrame({'Time':data_array[:,0],'yaw':data_array[:,1],'pitch':data_array[:,2],'roll':data_array[:,3]})
-                df['yaw'] = df['yaw'].astype(float)
-                df['pitch'] = df['pitch'].astype(float)
-                df['roll'] = df['roll'].astype(float)
-                self.YPR_data[f'{j}'] = df
+    def Compute_Orientation(self):
+        df = {'Time':[],'Satellite':[],'Yaw':[],'Pitch':[],'Roll':[],'Yaw Rate':[],'Pitch Rate':[],'Roll Rate':[]}
+        for sat_num,sat in enumerate(self.satellites):
+            data = np.array(self.satellites[sat].DataProviders.GetItemByName('AER Data').Group.Item(0).ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt,['Time','YPR321 yaw','YPR321 pitch','YPR321 roll','YPR321 yaw rate','YPR321 pitch rate','YPR321 roll rate']).DataSets.ToArray()).ravel()
+            time = data[0::7]
+            yaw = data[1::7]
+            pitch = data[2::7]
+            roll = data[3::7]
+            yaw_rate = data[4::7]
+            pitch_rate = data[5::7]
+            roll_rate = data[6::7]
+            for idx in range(len(time)):
+                if time[idx] != None:
+                    df['Time'].append(time[idx])
+                    df['Satellite'].append(sat_num+1)
+                    df['Yaw'].append(yaw[idx])
+                    df['Pitch'].append(pitch[idx])
+                    df['Roll'].append(roll[idx])
+                    df['Yaw Rate'].append(yaw_rate[idx])
+                    df['Pitch Rate'].append(pitch_rate[idx])
+                    df['Roll Rate'].append(roll_rate[idx])
+        self.Orientation_data = pd.DataFrame(df).sort_values('Time')
+        return 0
 
     def Compute_Lifetime(self,Cd=2.2,Cr=1.0,DragArea=13.65,SunArea=15.43,Mass=1000.0):
         labels=['SAT##','Orbits','Time']

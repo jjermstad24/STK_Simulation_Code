@@ -48,14 +48,13 @@ def Create_Poly(filename):
 
 def polygon_random_points (poly, num_points):
     min_x, min_y, max_x, max_y = poly.bounds
-    df = {'Lat':[],'Lon':[],'Alt':[]}
+    df = {'Lat':[],'Lon':[]}
     count = 0
     while count != num_points:
         random_point = Point([random.uniform(min_x, max_x), random.uniform(min_y, max_y)])
         if (random_point.within(poly)):
             df['Lat'].append(random_point.y)
             df['Lon'].append(random_point.x)
-            df['Alt'].append(0)
             count += 1
     return pd.DataFrame(df)
 
