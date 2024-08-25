@@ -41,7 +41,7 @@ class STK_Simulation:
         for i in range(len(data)):
             self.targets[f'Target{i+1}'] = self.root.CurrentScenario.Children.New(AgESTKObjectType.eTarget, f'Target{i+1}')
             # IAgFacility target: Target Object
-            self.targets[f'Target{i+1}'].Position.AssignGeodetic(float(data['Lat'][i]), float(data['Lon'][i]), float(data['Alt'][i]))  # Latitude, Longitude, Altitude
+            self.targets[f'Target{i+1}'].Position.AssignGeodetic(float(data['Lat'][i]), float(data['Lon'][i]), 0)  # Latitude, Longitude, Altitude
             # Set altitude to height of terrain
             self.targets[f'Target{i+1}'].UseTerrain = True
             # Set altitude to a distance above the ground
