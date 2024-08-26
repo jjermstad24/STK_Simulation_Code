@@ -8,6 +8,7 @@ from Scripts import *
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from alive_progress import alive_bar
+import scipy.interpolate as interpolate
 
 # if using astrogator uncomment the below
 # from agi.stk12.stkobjects.astrogator
@@ -113,14 +114,53 @@ class STK_Simulation:
                 bar()
         self.AzEl_data = pd.DataFrame(df).sort_values('Time')
         return 0
-
+    
+    def Interpolate_AzEl(self,interpolate_dt=2.5):
+        interpolated_df = {'Time':[],'Satellite':[],'Target':[],'Azimuth':[],'Elevation':[],'Group':[]}
+        n_sats = len(self.satellites)
+        n_targets = len(self.targets)
+        n_groups = len(np.unique(self.AzEl_data['Group'].values))
+        with alive_bar(n_sats*n_targets*n_groups,force_tty=True,bar='classic',title='2. Interpolating_AzEl  ',length=10) as bar:
+            for sat_num in range(n_sats):
+                sat_window = self.AzEl_data['Satellite'] == sat_num+1
+                for tar_num in range(n_targets):
+                    tar_window = self.AzEl_data['Target'] == tar_num+1
+                    for group in range(n_groups):
+                        group_window = self.AzEl_data['Group'].values==group+1
+                        if len(self.AzEl_data[sat_window&tar_window&group_window]) > 0:
+                            group_df = self.AzEl_data[sat_window&tar_window&group_window]
+                            t = group_df['Time'].values
+                            az = group_df['Azimuth'].values
+                            el = group_df['Elevation'].values
+                            
+                            times = np.arange(t[0],t[-1],interpolate_dt)
+                            if max(el)>=60 and len(t)>3:
+                                az_t = interpolate.interpn(points=[t],values=np.array([np.unwrap(az,period=360)]).T,xi=times,method='pchip')[:,0]
+                                el_t = interpolate.interp1d(x=t,y=[el],kind='cubic')(times)[0]
+                            else:
+                                ans = interpolate.interp1d(x=t,y=[np.unwrap(az,period=360),el],kind='quadratic')(times).T
+                                az_t = ans[:,0];el_t = ans[:,1]
+                            for idx,t in enumerate(times):
+                                interpolated_df['Time'].append(t)
+                                interpolated_df['Satellite'].append(sat_num+1)
+                                interpolated_df['Target'].append(tar_num+1)
+                                interpolated_df['Azimuth'].append(az_t[idx]%360)
+                                interpolated_df['Elevation'].append(el_t[idx])
+                                interpolated_df['Group'].append(group+1)
+                        bar()
+        self.AzEl_data = pd.concat([self.AzEl_data,pd.DataFrame(interpolated_df)],ignore_index=True).sort_values(by='Time')
+        self.AzEl_data['Satellite'] = pd.to_numeric(self.AzEl_data['Satellite'], downcast='integer')
+        self.AzEl_data['Target'] = pd.to_numeric(self.AzEl_data['Target'], downcast='integer')
+        self.AzEl_data['Group'] = pd.to_numeric(self.AzEl_data['Group'], downcast='integer')
+        return 0
+    
     def Sort_AzEl(self):
         self.AzEl_4d_representation = {}
         self.Targets_Point_Bins = {}
         for tar in self.targets:
             self.Targets_Point_Bins[tar] = np.zeros([36,9])
         df = {'Time':[],'Satellite':[],'Target':[],'Bin':[],'Point':[],'Target Percentage':[]}
-        with alive_bar(len(self.AzEl_data),force_tty=True,bar='classic',title='2. Sorting_AzEl  ',length=10) as bar:
+        with alive_bar(len(self.AzEl_data),force_tty=True,bar='classic',title='3. Sorting_AzEl  ',length=10) as bar:
             for idx in range(len(self.AzEl_data)):
                 df['Time'].append(self.AzEl_data['Time'].values[idx])
                 df['Satellite'].append(self.AzEl_data['Satellite'].values[idx])
@@ -135,6 +175,27 @@ class STK_Simulation:
         self.AzEl_4d_representation = pd.DataFrame(df)
         return 0
     
+    def Sort_AzEl(self):
+        self.AzEl_4d_representation = {}
+        self.Targets_Point_Bins = {}
+        for tar in self.targets:
+            self.Targets_Point_Bins[tar] = np.zeros([36,9])
+        df = {'Time':[],'Satellite':[],'Target':[],'Bin':[],'Point':[],'Target Percentage':[]}
+        with alive_bar(len(self.AzEl_data),force_tty=True,bar='classic',title='3. Sorting_AzEl  ',length=10) as bar:
+            for idx in range(len(self.AzEl_data)):
+                df['Time'].append(self.AzEl_data['Time'].values[idx])
+                df['Satellite'].append(self.AzEl_data['Satellite'].values[idx])
+                df['Target'].append(self.AzEl_data['Target'].values[idx])
+                r,c = int(self.AzEl_data['Azimuth'].values[idx]//10),int(self.AzEl_data['Elevation'].values[idx]//10)
+                df['Bin'].append(r*9+c)
+                tar = f"Target{self.AzEl_data['Target'].values[idx]}"
+                df['Point'].append(1/((self.Targets_Point_Bins[tar][r,c]+1)*(self.Targets_Point_Bins[tar][r,c]+1)))
+                self.Targets_Point_Bins[tar][r,c] += df['Point'][-1]
+                df['Target Percentage'].append(100*np.count_nonzero(self.Targets_Point_Bins[tar])/324)
+                bar()
+        self.AzEl_4d_representation = pd.DataFrame(df)
+        return 0
+
     def Compute_Orientation(self):
         df = {'Time':[],'Satellite':[],'Yaw':[],'Pitch':[],'Roll':[],'Yaw Rate':[],'Pitch Rate':[],'Roll Rate':[]}
         for sat_num,sat in enumerate(self.satellites):
