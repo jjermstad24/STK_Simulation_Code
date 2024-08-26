@@ -174,27 +174,6 @@ class STK_Simulation:
                 bar()
         self.AzEl_4d_representation = pd.DataFrame(df)
         return 0
-    
-    def Sort_AzEl(self):
-        self.AzEl_4d_representation = {}
-        self.Targets_Point_Bins = {}
-        for tar in self.targets:
-            self.Targets_Point_Bins[tar] = np.zeros([36,9])
-        df = {'Time':[],'Satellite':[],'Target':[],'Bin':[],'Point':[],'Target Percentage':[]}
-        with alive_bar(len(self.AzEl_data),force_tty=True,bar='classic',title='3. Sorting_AzEl  ',length=10) as bar:
-            for idx in range(len(self.AzEl_data)):
-                df['Time'].append(self.AzEl_data['Time'].values[idx])
-                df['Satellite'].append(self.AzEl_data['Satellite'].values[idx])
-                df['Target'].append(self.AzEl_data['Target'].values[idx])
-                r,c = int(self.AzEl_data['Azimuth'].values[idx]//10),int(self.AzEl_data['Elevation'].values[idx]//10)
-                df['Bin'].append(r*9+c)
-                tar = f"Target{self.AzEl_data['Target'].values[idx]}"
-                df['Point'].append(1/((self.Targets_Point_Bins[tar][r,c]+1)*(self.Targets_Point_Bins[tar][r,c]+1)))
-                self.Targets_Point_Bins[tar][r,c] += df['Point'][-1]
-                df['Target Percentage'].append(100*np.count_nonzero(self.Targets_Point_Bins[tar])/324)
-                bar()
-        self.AzEl_4d_representation = pd.DataFrame(df)
-        return 0
 
     def Compute_Orientation(self):
         df = {'Time':[],'Satellite':[],'Yaw':[],'Pitch':[],'Roll':[],'Yaw Rate':[],'Pitch Rate':[],'Roll Rate':[]}
