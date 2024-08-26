@@ -89,7 +89,7 @@ class STK_Simulation:
 
     def Compute_AzEl(self):
         df = {'Time':[],'Satellite':[],'Target':[],'Azimuth':[],'Elevation':[],'Group':[]}
-        with alive_bar(len(self.targets),force_tty=True,bar='classic',title='1. Computing_AzEl',length=10) as bar:
+        with alive_bar(len(self.targets),force_tty=True,bar='classic',title='- Computing_AzEl',length=10) as bar:
             for tar_num,tar in enumerate(self.targets):
                 for sat_num,sat in enumerate(self.satellites):
                     access = self.targets[tar].GetAccessToObject(self.satellites[sat])
@@ -120,7 +120,7 @@ class STK_Simulation:
         n_sats = len(self.satellites)
         n_targets = len(self.targets)
         n_groups = len(np.unique(self.AzEl_data['Group'].values))
-        with alive_bar(n_sats*n_targets*n_groups,force_tty=True,bar='classic',title='2. Interpolating_AzEl  ',length=10) as bar:
+        with alive_bar(n_sats*n_targets*n_groups,force_tty=True,bar='classic',title='- Interp_AzEl   ',length=10) as bar:
             for sat_num in range(n_sats):
                 sat_window = self.AzEl_data['Satellite'] == sat_num+1
                 for tar_num in range(n_targets):
@@ -149,30 +149,28 @@ class STK_Simulation:
                                 interpolated_df['Group'].append(group+1)
                         bar()
         self.AzEl_data = pd.concat([self.AzEl_data,pd.DataFrame(interpolated_df)],ignore_index=True).sort_values(by='Time')
-        self.AzEl_data['Satellite'] = pd.to_numeric(self.AzEl_data['Satellite'], downcast='integer')
-        self.AzEl_data['Target'] = pd.to_numeric(self.AzEl_data['Target'], downcast='integer')
-        self.AzEl_data['Group'] = pd.to_numeric(self.AzEl_data['Group'], downcast='integer')
+        # self.AzEl_data['Satellite'] = pd.to_numeric(self.AzEl_data['Satellite'], downcast='integer')
+        # self.AzEl_data['Target'] = pd.to_numeric(self.AzEl_data['Target'], downcast='integer')
+        # self.AzEl_data['Group'] = pd.to_numeric(self.AzEl_data['Group'], downcast='integer')
         return 0
-    
+            
     def Sort_AzEl(self):
-        self.AzEl_4d_representation = {}
         self.Targets_Point_Bins = {}
         for tar in self.targets:
             self.Targets_Point_Bins[tar] = np.zeros([36,9])
-        df = {'Time':[],'Satellite':[],'Target':[],'Bin':[],'Point':[],'Target Percentage':[]}
-        with alive_bar(len(self.AzEl_data),force_tty=True,bar='classic',title='3. Sorting_AzEl  ',length=10) as bar:
+        Bin = [];Point = [];Target_Percentage = []
+        with alive_bar(len(self.AzEl_data),force_tty=True,bar='classic',title='- Sorting_AzEl  ',length=10) as bar:
             for idx in range(len(self.AzEl_data)):
-                df['Time'].append(self.AzEl_data['Time'].values[idx])
-                df['Satellite'].append(self.AzEl_data['Satellite'].values[idx])
-                df['Target'].append(self.AzEl_data['Target'].values[idx])
                 r,c = int(self.AzEl_data['Azimuth'].values[idx]//10),int(self.AzEl_data['Elevation'].values[idx]//10)
-                df['Bin'].append(r*9+c)
+                Bin.append(r*9+c)
                 tar = f"Target{self.AzEl_data['Target'].values[idx]}"
-                df['Point'].append(1/((self.Targets_Point_Bins[tar][r,c]+1)*(self.Targets_Point_Bins[tar][r,c]+1)))
-                self.Targets_Point_Bins[tar][r,c] += df['Point'][-1]
-                df['Target Percentage'].append(100*np.count_nonzero(self.Targets_Point_Bins[tar])/324)
+                Point.append(1/((self.Targets_Point_Bins[tar][r,c]+1)*(self.Targets_Point_Bins[tar][r,c]+1)))
+                self.Targets_Point_Bins[tar][r,c] += Point[-1]
+                Target_Percentage.append(100*np.count_nonzero(self.Targets_Point_Bins[tar])/324)
                 bar()
-        self.AzEl_4d_representation = pd.DataFrame(df)
+        self.AzEl_data.loc[:,"Bin"] = Bin
+        self.AzEl_data.loc[:,"Point"] = Point
+        self.AzEl_data.loc[:,"Target Percentage"] = Target_Percentage
         return 0
 
     def Compute_Orientation(self):
