@@ -50,7 +50,7 @@ class STK_Simulation:
             
     def Satellite_Loader(self,Filename,External_Pointing_File=False):
         self.satellites = {}
-        self.sensors = {}
+        self.radars = {}
         for i in self.root.CurrentScenario.Children.GetElements(AgESTKObjectType.eSatellite):
             i.Unload()
 
@@ -80,12 +80,12 @@ class STK_Simulation:
             self.satellites[f'Satellite{i+1}'].Propagator.Propagate()
 
             # IAgSatellite satellite: Satellite object
-            # self.sensors[f'Satellite{i+1}'] = self.satellites[f'Satellite{i+1}'].Children.New(AgESTKObjectType.eSensor, f'Sensor{i+1}')
-            # self.sensors[f'Satellite{i+1}'].CommonTasks.SetPatternSimpleConic(5, 0.1)
-            # # self.sensors[f'Satellite{i+1}'].CommonTasks.SetPatternSAR(0,90,0,0,data['Per'][i])
-            # self.sensors[f'Satellite{i+1}'].SetPointingType(5)
+            self.radars[f'Satellite{i+1}'] = self.satellites[f'Satellite{i+1}'].Children.New(AgESTKObjectType.eRadar, f'Radar{i+1}')
+            # self.radars[f'Satellite{i+1}'].CommonTasks.SetPatternSimpleConic(5, 0.1)
+            # self.radars[f'Satellite{i+1}'].CommonTasks.SetPatternSAR(0,90,0,0,data['Per'][i])
+            # self.radars[f'Satellite{i+1}'].SetPointingType(5)
             # for j in self.targets:
-            #     self.sensors[f'Satellite{i+1}'].Pointing.Targets.Add(f'*/Target/{j}')
+                # self.radars[f'Satellite{i+1}'].Pointing.Targets.Add(f'*/Target/{j}')
 
     def Compute_AzEl(self):
         df = {'Time':[],'Satellite':[],'Target':[],'Azimuth':[],'Elevation':[],'Group':[]}
@@ -115,6 +115,28 @@ class STK_Simulation:
         self.AzEl_data = pd.DataFrame(df).sort_values('Time')
         return 0
     
+    def Compute_SAR_data(self):
+        df = {'Time':[],'Satellite':[],'Target':[],'SNR':[]}
+        with alive_bar(len(self.targets),force_tty=True,bar='classic',title='1. Computing_SAR_data',length=10) as bar:
+            for tar_num,tar in enumerate(self.targets):
+                for sat_num, rad in enumerate(self.radars):
+                    access = self.targets[tar].GetAccessToObject(self.radars[rad])
+                    access.ComputeAccess()
+                    data = access.DataProviders.GetItemByName('Radar SearchTrack').ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt,['Time','S/T SNR1']).DataSets.ToArray()
+                    data = np.array(data).ravel()
+                    snr = data[0::2]
+                    time = data[1::2]
+                    for idx in range(len(time)):
+                        if time[idx] != None:
+                            df['Time'].append(time[idx])
+                            df['Satellite'].append(sat_num+1)
+                            df['Target'].append(tar_num+1)
+                            df['SNR'].append(np.abs(snr[idx]))
+                bar()
+        self.SAR_data = pd.DataFrame(df).sort_values('Time')
+        return 0
+
+
     def Interpolate_AzEl(self,interpolate_dt=2.5):
         interpolated_df = {'Time':[],'Satellite':[],'Target':[],'Azimuth':[],'Elevation':[],'Group':[]}
         n_sats = len(self.satellites)
@@ -153,6 +175,8 @@ class STK_Simulation:
         self.AzEl_data['Target'] = pd.to_numeric(self.AzEl_data['Target'], downcast='integer')
         self.AzEl_data['Group'] = pd.to_numeric(self.AzEl_data['Group'], downcast='integer')
         return 0
+    
+
     
     def Sort_AzEl(self):
         self.AzEl_4d_representation = {}
