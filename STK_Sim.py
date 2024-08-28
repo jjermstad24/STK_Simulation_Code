@@ -78,14 +78,24 @@ class STK_Simulation:
             # Apply the changes made to the satellite's state and propagate:
             self.satellites[f'Satellite{i+1}'].Propagator.InitialState.Representation.Assign(keplerian)
             self.satellites[f'Satellite{i+1}'].Propagator.Propagate()
+            
 
             # IAgSatellite satellite: Satellite object
             self.radars[f'Satellite{i+1}'] = self.satellites[f'Satellite{i+1}'].Children.New(AgESTKObjectType.eRadar, f'Radar{i+1}')
-            # self.radars[f'Satellite{i+1}'].CommonTasks.SetPatternSimpleConic(5, 0.1)
-            # self.radars[f'Satellite{i+1}'].CommonTasks.SetPatternSAR(0,90,0,0,data['Per'][i])
-            # self.radars[f'Satellite{i+1}'].SetPointingType(5)
-            # for j in self.targets:
-                # self.radars[f'Satellite{i+1}'].Pointing.Targets.Add(f'*/Target/{j}')
+            self.radars[f'Satellite{i+1}'].SetModel("Monostatic")
+            self.radars[f'Satellite{i+1}'].Model.AntennaControl.SetEmbeddedModel("Parabolic")
+            self.radars[f'Satellite{i+1}'].Model.SetMode("SAR")
+            # self.radars[f'Satellite{i+1}'].Model.fixedPrf.PulseDefinition.Prf = 0.002
+            # self.radars[f'Satellite{i+1}'].Model.fixedPrf.PulseDefinition.PulseWidth = 1E-08
+            # self.radars[f'Satellite{i+1}'].Model.fixedPrf.PulseDefinition.NumberOfPulses = 25
+            # self.radars[f'Satellite{i+1}'].Model.fixedPrf.PulseIntegrationType = AgERadarPulseIntegrationType.eRadarPulseIntegrationTypeGoalSNR
+            # self.radars[f'Satellite{i+1}'].Model.fixedPrf.PulseIntegration.pulseIntGoalSNR.SNR = 40
+            # self.radars[f'Satellite{i+1}'].Model.Transmitter.FrequencySpecification = AgERadarFrequencySpec.eRadarFrequencySpecFrequency
+            # self.radars[f'Satellite{i+1}'].Model.Transmitter.Frequency = 2.1
+            # self.radars[f'Satellite{i+1}'].Model.Transmitter.Power = 50
+            # self.radars[f'Satellite{i+1}'].Model.Receiver.SystemNoiseTemperature.ComputeType = AgENoiseTempComputeType.eNoiseTempComputeTypeCalculate
+            # self.radars[f'Satellite{i+1}'].Model.Receiver.SystemNoiseTemperature.AntennaNoiseTemperature.ComputeType = AgENoiseTempComputeType.eNoiseTempComputeTypeCalculate
+
 
     def Compute_AzEl(self):
         df = {'Time':[],'Satellite':[],'Target':[],'Azimuth':[],'Elevation':[],'Group':[]}
@@ -122,7 +132,7 @@ class STK_Simulation:
                 for sat_num, rad in enumerate(self.radars):
                     access = self.targets[tar].GetAccessToObject(self.radars[rad])
                     access.ComputeAccess()
-                    data = access.DataProviders.GetItemByName('Radar SearchTrack').ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt,['Time','S/T SNR1']).DataSets.ToArray()
+                    data = access.DataProviders.GetItemByName('Radar SAR').ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt).DataSets.ToArray()
                     data = np.array(data).ravel()
                     snr = data[0::2]
                     time = data[1::2]
