@@ -93,6 +93,11 @@ class STK_Simulation:
             # for j in self.targets:
             #     self.radars[satellite_num].Pointing.Targets.Add(f'*/Target/{j}')
 
+    def Reset_Target_Bins(self):
+        for target in self.targets:
+            self.target_bins[target] = np.zeros([36,9])
+            self.target_times[target] = self.root.CurrentScenario.StopTime
+
     def Update_Target_Bins(self,Interval):
         for bin in Interval.bins:
             if self.target_bins[Interval.target_number][bin//9,bin%9] == 0:
@@ -101,6 +106,7 @@ class STK_Simulation:
         return 0
 
     def Compute_AzEl(self):
+        self.Reset_Target_Bins()
         self.Intervals = []
         with alive_bar(len(self.targets)*len(self.satellites),force_tty=True,bar='classic',title='- Computing_AzEl',length=10) as bar:
             for tar_num,tar in enumerate(self.targets):
@@ -119,39 +125,3 @@ class STK_Simulation:
                             self.Update_Target_Bins(I)
                     bar()
         return 0
-    
-    # def Interpolate_AzEl(self,interpolate_dt=2.5):
-    #     interpolated_df = {'Time':[],'Satellite':[],'Target':[],'Azimuth':[],'Elevation':[],'Group':[]}
-    #     n_sats = len(self.satellites)
-    #     n_targets = len(self.targets)
-    #     n_groups = len(np.unique(self.AzEl_data['Group'].values))
-    #     with alive_bar(n_sats*n_targets*n_groups,force_tty=True,bar='classic',title='- Interp_AzEl   ',length=10) as bar:
-    #         for sat_num in range(n_sats):
-    #             sat_window = self.AzEl_data['Satellite'] == sat_num+1
-    #             for tar_num in range(n_targets):
-    #                 tar_window = self.AzEl_data['Target'] == tar_num+1
-    #                 for group in range(n_groups):
-    #                     group_window = self.AzEl_data['Group'].values==group+1
-    #                     if len(self.AzEl_data[sat_window&tar_window&group_window]) > 0:
-    #                         group_df = self.AzEl_data[sat_window&tar_window&group_window]
-    #                         t = group_df['Time'].values
-    #                         az = group_df['Azimuth'].values
-    #                         el = group_df['Elevation'].values
-                            
-    #                         times = np.arange(t[0],t[-1],interpolate_dt)
-    #                         if max(el)>=60 and len(t)>3:
-    #                             az_t = interpolate.interpn(points=[t],values=np.array([np.unwrap(az,period=360)]).T,xi=times,method='pchip')[:,0]
-    #                             el_t = interpolate.interp1d(x=t,y=[el],kind='cubic')(times)[0]
-    #                         else:
-    #                             ans = interpolate.interp1d(x=t,y=[np.unwrap(az,period=360),el],kind='quadratic')(times).T
-    #                             az_t = ans[:,0];el_t = ans[:,1]
-    #                         for idx,t in enumerate(times):
-    #                             interpolated_df['Time'].append(t)
-    #                             interpolated_df['Satellite'].append(sat_num+1)
-    #                             interpolated_df['Target'].append(tar_num+1)
-    #                             interpolated_df['Azimuth'].append(az_t[idx]%360)
-    #                             interpolated_df['Elevation'].append(el_t[idx])
-    #                             interpolated_df['Group'].append(group+1)
-    #                     bar()
-    #     self.AzEl_data = pd.concat([self.AzEl_data,pd.DataFrame(interpolated_df)],ignore_index=True).sort_values(by='Time')
-    #     return 0
