@@ -222,8 +222,8 @@ class Optimizer:
             self.stk_object.Satellite_Loader(satellites_filename)
             print("------------------------------------------------------------------------")
             self.stk_object.Compute_AzEl()
-            percentages = [100*np.count_nonzero(self.stk_object.target_bins[tar])/324 for tar in self.stk_object.targets]
-            times = [self.stk_object.target_times[tar]/86400 for tar in self.stk_object.targets]
+            percentages = [100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))]
+            times = [self.stk_object.target_times[idx]/86400 for idx in range(len(self.stk_object.targets))]
             return np.average(percentages),np.max(times),len(self.stk_object.satellites)
         else:
             return 0,self.stk_object.root.CurrentScenario.StopTime/86400,12

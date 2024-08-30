@@ -31,11 +31,11 @@ class STK_Simulation:
         self.scenario = self.root.NewScenario(Filename)
         self.dt = 60
         self.Interpolate = False
-        res = self.root.ExecuteCommand("Parallel / AutomaticallyComputeInParallel On")
-        res = self.root.ExecuteCommand(f"Parallel / Configuration ParallelType Local NumberOfLocalCores {os.cpu_count()}")
+        self.root.ExecuteCommand("Parallel / AutomaticallyComputeInParallel On")
+        self.root.ExecuteCommand(f"Parallel / Configuration ParallelType Local NumberOfLocalCores {os.cpu_count()}")
 
     def Target_Loader(self,Filename):
-        self.targets = {}
+        self.targets = []
         self.target_bins = []
         self.target_times = []
         for target in self.root.CurrentScenario.Children.GetElements(AgESTKObjectType.eTarget):
@@ -44,29 +44,29 @@ class STK_Simulation:
         data = pd.read_csv(Filename,delimiter=',')
 
         for target_num in range(len(data)):
-            self.targets[target_num] = self.root.CurrentScenario.Children.New(AgESTKObjectType.eTarget, f"Target_{target_num}")
+            self.targets.append(self.root.CurrentScenario.Children.New(AgESTKObjectType.eTarget, f"Target_{target_num}"))
             # IAgFacility target: Target Object
-            self.targets[target_num].Position.AssignGeodetic(float(data['Lat'][target_num]), float(data['Lon'][target_num]), 0)  # Latitude, Longitude, Altitude
+            self.targets[-1].Position.AssignGeodetic(float(data['Lat'][target_num]), float(data['Lon'][target_num]), 0)  # Latitude, Longitude, Altitude
             # Set altitude to height of terrain
-            self.targets[target_num].UseTerrain = True
+            self.targets[-1].UseTerrain = True
             # Set altitude to a distance above the ground
-            self.targets[target_num].HeightAboveGround = 0   # km
+            self.targets[-1].HeightAboveGround = 0   # km
             self.target_bins.append(np.zeros([36,9]))
             self.target_times.append(self.root.CurrentScenario.StopTime)
             
     def Satellite_Loader(self,Filename,External_Pointing_File=False):
-        self.satellites = {}
-        self.radars = {}
+        self.satellites = []
+        self.radars = []
         for satellite in self.root.CurrentScenario.Children.GetElements(AgESTKObjectType.eSatellite):
             satellite.Unload()
 
         data = pd.read_csv(Filename,delimiter=',')
 
         for satellite_num in range(len(data)):
-            self.satellites[satellite_num] = self.root.CurrentScenario.Children.New(AgESTKObjectType.eSatellite, f"Satellite_{satellite_num}")
+            self.satellites.append(self.root.CurrentScenario.Children.New(AgESTKObjectType.eSatellite, f"Satellite_{satellite_num}"))
 
             # IAgSatellite satellite: Satellite object
-            keplerian = self.satellites[satellite_num].Propagator.InitialState.Representation.ConvertTo(AgEOrbitStateType.eOrbitStateClassical)
+            keplerian = self.satellites[-1].Propagator.InitialState.Representation.ConvertTo(AgEOrbitStateType.eOrbitStateClassical)
             keplerian.SizeShapeType = AgEClassicalSizeShape.eSizeShapeAltitude
             keplerian.LocationType = AgEClassicalLocation.eLocationTrueAnomaly
             keplerian.Orientation.AscNodeType = AgEOrientationAscNode.eAscNodeLAN
@@ -82,8 +82,8 @@ class STK_Simulation:
             keplerian.Location.Value = float(data['Loc'][satellite_num])                             # deg
 
             # Apply the changes made to the satellite's state and propagate:
-            self.satellites[satellite_num].Propagator.InitialState.Representation.Assign(keplerian)
-            self.satellites[satellite_num].Propagator.Propagate()
+            self.satellites[-1].Propagator.InitialState.Representation.Assign(keplerian)
+            self.satellites[-1].Propagator.Propagate()
 
             # IAgSatellite satellite: Satellite object
             # self.radars[satellite_num] = self.satellites[satellite_num].Children.New(AgESTKObjectType.eRadar, f'Radar{i+1}')
@@ -94,9 +94,9 @@ class STK_Simulation:
             #     self.radars[satellite_num].Pointing.Targets.Add(f'*/Target/{j}')
 
     def Reset_Target_Bins(self):
-        for target in self.targets:
-            self.target_bins[target] = np.zeros([36,9])
-            self.target_times[target] = self.root.CurrentScenario.StopTime
+        for idx in range(len(self.targets)):
+            self.target_bins[idx] = np.zeros([36,9])
+            self.target_times[idx] = self.root.CurrentScenario.StopTime
 
     def Update_Target_Bins(self,Interval):
         for bin in Interval.bins:
@@ -111,7 +111,7 @@ class STK_Simulation:
         with alive_bar(len(self.targets)*len(self.satellites),force_tty=True,bar='classic',title='- Computing_AzEl',length=10) as bar:
             for tar_num,tar in enumerate(self.targets):
                 for sat_num,sat in enumerate(self.satellites):
-                    access = self.targets[tar].GetAccessToObject(self.satellites[sat])
+                    access = tar.GetAccessToObject(sat)
                     access.ComputeAccess()
                     data_set = access.DataProviders.GetItemByName('AER Data').Group.Item(0).ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt,['Time','Azimuth','Elevation']).DataSets
                     data = data_set.ToNumpyArray()
@@ -125,3 +125,15 @@ class STK_Simulation:
                             self.Update_Target_Bins(I)
                     bar()
         return 0
+    
+    def Get_Satellite_DP(self,bus_name):
+        dfs = []
+        with alive_bar(len(self.satellites),force_tty=True,bar='classic',title=f'- Computing_{bus_name}',length=10) as bar:
+            for sat in self.satellites:
+                bus = sat.DataProviders.GetItemByName(bus_name)
+                df = bus.Exec(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt).DataSets.ToPandasDataFrame()
+                for col in df.columns:
+                    df[col] = df[col].astype(float,errors='ignore')
+                dfs.append(df)
+                bar()
+        return dfs
