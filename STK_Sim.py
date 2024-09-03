@@ -81,17 +81,12 @@ class STK_Simulation:
             keplerian.Orientation.AscNode.Value = float(data['Asc'][satellite_num])            # deg
             keplerian.Location.Value = float(data['Loc'][satellite_num])                             # deg
 
+            self.root.ExecuteCommand(f'SetAttitude */Satellite/Satellite_{satellite_num} Profile NadirECIVel Offset 0.0')
+            # self.root.ExecuteCommand(f'SetAttitude */Satellite/Satellite_{satellite_num} Profile NadirOrbit Offset 0.0')
+
             # Apply the changes made to the satellite's state and propagate:
             self.satellites[-1].Propagator.InitialState.Representation.Assign(keplerian)
             self.satellites[-1].Propagator.Propagate()
-
-            # IAgSatellite satellite: Satellite object
-            # self.radars[satellite_num] = self.satellites[satellite_num].Children.New(AgESTKObjectType.eRadar, f'Radar{i+1}')
-            # self.radars[satellite_num].CommonTasks.SetPatternSimpleConic(5, 0.1)
-            # self.radars[satellite_num].CommonTasks.SetPatternSAR(0,90,0,0,data['Per'][i])
-            # self.radars[satellite_num].SetPointingType(5)
-            # for j in self.targets:
-            #     self.radars[satellite_num].Pointing.Targets.Add(f'*/Target/{j}')
 
     def Reset_Target_Bins(self):
         for idx in range(len(self.targets)):
@@ -128,12 +123,35 @@ class STK_Simulation:
     
     def Get_Satellite_DP(self,bus_name):
         dfs = []
+        s = bus_name.split("/")
         with alive_bar(len(self.satellites),force_tty=True,bar='classic',title=f'- Computing_{bus_name}',length=10) as bar:
             for sat in self.satellites:
-                bus = sat.DataProviders.GetItemByName(bus_name)
-                df = bus.Exec(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt).DataSets.ToPandasDataFrame()
+                if len(s)==2:
+                    bus = sat.DataProviders.GetItemByName(s[0])
+                    df = bus.Group.GetItemByName(s[1]).Exec(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt).DataSets.ToPandasDataFrame()
+                else:
+                    bus = sat.DataProviders.GetItemByName(bus_name)
+                    df = bus.Exec(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt).DataSets.ToPandasDataFrame()
                 for col in df.columns:
                     df[col] = df[col].astype(float,errors='ignore')
                 dfs.append(df)
                 bar()
         return dfs
+    
+    def Update_SAR(self):
+        self.radar = []
+        for satellite_num,sat in enumerate(self.satellites):
+            self.radars.append(sat.Children.New(AgESTKObjectType.eRadar, f'Radar_{satellite_num}'))
+            self.radars[-1].Model.SetMode("SAR")
+            self.radars[-1].Model.AntennaControl.SetEmbeddedModel("Phased Array")
+
+    def Update_Mass_Properties(self,M=275,I=[[60,0,0],
+                                             [0,90,0],
+                                             [0,0,120]]):
+        for sat in self.satellites:
+            sat.MassProperties.Mass = M
+            sat.MassProperties.Inertia.Ixx = I[0][0]
+            sat.MassProperties.Inertia.Ixz = I[1][0]
+            sat.MassProperties.Inertia.Iyy = I[1][1]
+            sat.MassProperties.Inertia.Iyz = I[2][0]
+            sat.MassProperties.Inertia.Izz = I[2][2]
