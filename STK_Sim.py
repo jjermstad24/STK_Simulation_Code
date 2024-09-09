@@ -32,7 +32,7 @@ class STK_Simulation:
         self.dt = 60
         self.Interpolate = False
         self.root.ExecuteCommand("Parallel / AutomaticallyComputeInParallel On")
-        self.root.ExecuteCommand(f"Parallel / Configuration ParallelType Local NumberOfLocalCores {os.cpu_count()}")
+        self.root.ExecuteCommand(f"Parallel / Configuration ParallelType Local NumberOfLocalCores 16")
 
     def Target_Loader(self,Filename):
         self.targets = []
@@ -125,6 +125,30 @@ class STK_Simulation:
                             self.Update_Target_Bins(I)
                     bar()
         return 0
+    
+    
+    def Create_Constellation(self, con_name):
+        self.chain = self.root.CurrentScenario.Children.New(AgESTKObjectType.eConstellation, con_name)
+        return 0
+    
+    def Update_Chain(self):
+        self.root.ExecuteCommand(f'Chains */Chain/{self.chain_name} Connections Add from Constellation/TarCon to Constellation/{f"SatCon{i}"}')
+
+    def Compute_Chain_AzEl(self):
+        self.Reset_Target_Bins()
+
+        with alive_bar(len(self.targets),force_tty=True,bar='classic',title='- Computing_AzEl',length=10) as bar:
+            data_set = self.chain.DataProviders.GetItemByName("Access AER Data").ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt,['Time','Azimuth','Elevation']).DataSets
+            data = data_set.ToNumpyArray()
+            for tar_num,tar in enumerate(self.targets):
+                    tar_data = data[data[:, 3] == f'Target_{tar_num}']
+                    if len(data) > 0:
+                        self.bins = np.unique([int(az//10)*9+int(el//10) for az,el in zip(tar_data[:,1],tar_data[:,2])])
+                        self.Update_Target_Bins(self.bins)
+            bar()
+        return 0
+    
+
     
     def Get_Satellite_DP(self,bus_name):
         dfs = []

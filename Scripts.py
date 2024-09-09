@@ -89,6 +89,8 @@ def Pointing_File_Generator(filename,period):
         f.write(f'{period/162*(i+1)} {(i%9+1)*10-5} {(i//9+1)*10-5}\n')
     f.write('End Attitude')
     f.close()
+
+    
 class Optimizer:
     def __init__(self,stk_object,n_pop,n_gen,n_sats):
         self.stk_object = stk_object
