@@ -225,10 +225,10 @@ class Optimizer:
             print("------------------------------------------------------------------------")
             self.stk_object.Compute_AzEl()
             percentages = [100*np.count_nonzero(self.target_bins[idx])/324 for idx in range(len(self.targets))]
-            times = [self.stk_object.target_times[idx]/86400 for idx in range(len(self.targets))]
+            times = [self.target_times[idx]/86400 for idx in range(len(self.targets))]
             return np.average(percentages),np.max(times),len(self.satellites)
         else:
-            return 0,self.stk_object.root.CurrentScenario.StopTime/86400,12
+            return 0,self.root.CurrentScenario.StopTime/86400,12
         
 class Interval:
     def __init__(self,access_point,target_number,satellite_number,Interpolate=True):
