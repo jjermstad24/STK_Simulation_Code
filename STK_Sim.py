@@ -145,10 +145,36 @@ class STK_Simulation:
 
     
     
-    def Create_Constellation(self, con_name):
-        self.chain = self.root.CurrentScenario.Children.New(AgESTKObjectType.eConstellation, con_name)
+    def Create_TarCon(self):
+        self.constellation = self.root.CurrentScenario.Children.New(AgESTKObjectType.eConstellation, "TarCon")
+        for tar_num, tar in enumerate(self.targets):
+            self.constellation.Objects.AddObject(tar)
         return 0
     
+
+    def Create_Chain(self):
+        self.chain_name = 'Targets_to_Constellations'
+        self.chain = self.root.CurrentScenario.Children.New(AgESTKObjectType.eChain, self.chain_name)
+        self.chain.AutoRecompute = False
+        return 0
+    
+    def Create_SatCon(self):
+
+        for con in range(len(self.satellites)//10 + 1):
+            self.constellation = self.root.CurrentScenario.Children.New(AgESTKObjectType.eConstellation, f"SatCon{con}")
+            self.root.ExecuteCommand(f'Chains */Chain/Targets_to_Constellations Connections Add from Constellation/TarCon to Constellation/{f"SatCon{con}"}')
+
+        for sat_num, sat in enumerate(self.satellites):
+            sat_con_num = sat_num//10
+            self.constellation = self.root.CurrentScenario.Children.GetItemByName(f"SatCon{sat_con_num}")
+            self.constellation.Objects.AddObject(sat)
+
+        
+        self.root.ExecuteCommand(f"Chains */Chain/Targets_to_Constellations Connections SetStartInst Constellation/TarCon")
+        self.root.ExecuteCommand(f"Chains */Chain/Targets_to_Constellations Connections SetEndInst Constellation/SatCon{sat_con_num}")
+            
+        return 0
+
     def Update_Chain(self):
         self.root.ExecuteCommand(f'Chains */Chain/{self.chain_name} Connections Add from Constellation/TarCon to Constellation/{f"SatCon{i}"}')
 

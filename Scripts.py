@@ -212,14 +212,14 @@ class Optimizer:
                     if len(planes)>1:Asc += 180/(len(planes)-1)
                 file.close()
             satellites_filename = 'Input_Files/Satellites_File.txt'
-        self.stk_object.Satellite_Loader(satellites_filename)
-        print("------------------------------------------------------------------------")
-        self.stk_object.Compute_AzEl()
-        percentages = [100*np.count_nonzero(self.target_bins[idx])/324 for idx in range(len(self.targets))]
-        times = [self.target_times[idx]/86400 for idx in range(len(self.targets))]
-        return np.average(percentages),np.max(times),len(self.satellites)
-        #else:
-            #return 0,self.root.CurrentScenario.StopTime/86400,12
+            self.stk_object.Satellite_Loader(satellites_filename)
+            print("------------------------------------------------------------------------")
+            self.stk_object.Compute_AzEl()
+            percentages = [100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))]
+            times = [self.stk_object.target_times[idx]/86400 for idx in range(len(self.stk_object.targets))]
+            return np.average(percentages),np.max(times),len(self.stk_object.satellites)
+        else:
+            return 0,self.root.CurrentScenario.StopTime/86400,12
         
 class Interval:
     def __init__(self,access_point,target_number,satellite_number,Interpolate=True):
