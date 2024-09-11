@@ -81,15 +81,6 @@ def plot_targets_and_polygon(poly,filename):
             'center': {'lon': 0, 'lat': 0},
             'zoom': 0})
     return fig
-
-def Pointing_File_Generator(filename,period):
-    f = open(filename,"w")
-    f.write("stk.v.12.1.1\nBegin\tAttitude\nNumberofAttitudePoints\t162\nSequence\t323\nRepeatPattern\n")
-    for i in range(162):
-        f.write(f'{period/162*(i+1)} {(i%9+1)*10-5} {(i//9+1)*10-5}\n')
-    f.write('End Attitude')
-    f.close()
-
     
 class Optimizer:
     def __init__(self,stk_object,n_pop,n_gen,n_sats):
@@ -221,14 +212,14 @@ class Optimizer:
                     if len(planes)>1:Asc += 180/(len(planes)-1)
                 file.close()
             satellites_filename = 'Input_Files/Satellites_File.txt'
-            self.stk_object.Satellite_Loader(satellites_filename)
-            print("------------------------------------------------------------------------")
-            self.stk_object.Compute_AzEl()
-            percentages = [100*np.count_nonzero(self.target_bins[idx])/324 for idx in range(len(self.targets))]
-            times = [self.target_times[idx]/86400 for idx in range(len(self.targets))]
-            return np.average(percentages),np.max(times),len(self.satellites)
-        else:
-            return 0,self.root.CurrentScenario.StopTime/86400,12
+        self.stk_object.Satellite_Loader(satellites_filename)
+        print("------------------------------------------------------------------------")
+        self.stk_object.Compute_AzEl()
+        percentages = [100*np.count_nonzero(self.target_bins[idx])/324 for idx in range(len(self.targets))]
+        times = [self.target_times[idx]/86400 for idx in range(len(self.targets))]
+        return np.average(percentages),np.max(times),len(self.satellites)
+        #else:
+            #return 0,self.root.CurrentScenario.StopTime/86400,12
         
 class Interval:
     def __init__(self,access_point,target_number,satellite_number,Interpolate=True):

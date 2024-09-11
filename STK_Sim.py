@@ -126,6 +126,24 @@ class STK_Simulation:
                     bar()
         return 0
     
+    def Compute_AzEl_No_Interpolation(self):
+        self.Reset_Target_Bins()
+        self.Intervals = []
+        with alive_bar(len(self.targets)*len(self.satellites),force_tty=True,bar='classic',title='- Computing_AzEl',length=10) as bar:
+            for tar_num,tar in enumerate(self.targets):
+                for sat_num,sat in enumerate(self.satellites):
+                    access = tar.GetAccessToObject(sat)
+                    access.ComputeAccess()
+                    data_set = access.DataProviders.GetItemByName('AER Data').Group.Item(0).ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt,['Time','Azimuth','Elevation']).DataSets
+                    data = data_set.ToNumpyArray()
+                    data = np.array([row for row in data if None not in row])
+                    if len(data) > 0:
+                        self.bins = np.unique([int((float(az)//10)*9) + int(float(el)//10) for az,el in zip(data[:,1],data[:,2])])
+                        self.target_bins[tar_num][self.bins//9,self.bins%9]+=1
+                    bar()
+        return 0
+
+    
     
     def Create_Constellation(self, con_name):
         self.chain = self.root.CurrentScenario.Children.New(AgESTKObjectType.eConstellation, con_name)
@@ -136,18 +154,21 @@ class STK_Simulation:
 
     def Compute_Chain_AzEl(self):
         self.Reset_Target_Bins()
+        with alive_bar(1,force_tty=True,bar='classic',title='- Computing_Access_In_Parallel',length=3) as bar:
+            self.chain.ComputeAccess()
+            bar()
 
         with alive_bar(len(self.targets),force_tty=True,bar='classic',title='- Computing_AzEl',length=10) as bar:
-            data_set = self.chain.DataProviders.GetItemByName("Access AER Data").ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt,['Time','Azimuth','Elevation']).DataSets
+            data_set = self.chain.DataProviders.GetItemByName("Access AER Data").ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt,['Time','Azimuth','Elevation', 'Strand Name']).DataSets
             data = data_set.ToNumpyArray()
             for tar_num,tar in enumerate(self.targets):
-                    tar_data = data[data[:, 3] == f'Target_{tar_num}']
-                    if len(data) > 0:
-                        self.bins = np.unique([int(az//10)*9+int(el//10) for az,el in zip(tar_data[:,1],tar_data[:,2])])
-                        self.Update_Target_Bins(self.bins)
-            bar()
-        return 0
-    
+                tar_data = data[(data[:, 3] != None) & (np.char.find(data[:, 3].astype(str), f'Target_{tar_num} ') != -1)]
+                
+                if len(tar_data) > 0:
+                    self.bins = np.unique([int((az//10)*9) + int(el//10) for az,el in zip(tar_data[:,1].astype(float),tar_data[:,2].astype(float))])
+                    self.target_bins[tar_num][self.bins//9,self.bins%9]+=1
+                bar()
+        
 
     
     def Get_Satellite_DP(self,bus_name):
