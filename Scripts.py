@@ -247,5 +247,12 @@ class Interval:
         else:
             self.bins = np.unique([int(az//10)*9+int(el//10) for az,el in zip(access_point[:,1],access_point[:,2])])
 
-    def __repr__(self) -> str:
-        return f"Time: {self.start:.2f}->{self.stop:.2f}\nBins: {self.bins}"                            
+def Interpolate(time,az,el):
+    times = np.arange(time[0],time[-1],2.5)
+    if max(el)>=60 and len(time)>3:
+        az_t = interpolate.interpn(points=[time],values=np.array([np.unwrap(az,period=360)]).T,xi=times,method='pchip')[:,0]%360
+        el_t = interpolate.interp1d(x=time,y=[el],kind='cubic')(times)[0]
+    else:
+        ans = interpolate.interp1d(x=time,y=[np.unwrap(az,period=360),el],kind='quadratic')(times).T
+        az_t = ans[:,0]%360;el_t = ans[:,1]
+    return times,az_t,el_t

@@ -98,31 +98,31 @@ class STK_Simulation:
             self.target_bins[idx] = np.zeros([36,9])
             self.target_times[idx] = self.root.CurrentScenario.StopTime
 
-    def Update_Target_Bins(self,Interval):
-        for bin in Interval.bins:
-            if self.target_bins[Interval.target_number][bin//9,bin%9] == 0:
-                self.target_times[Interval.target_number] = Interval.stop
-            self.target_bins[Interval.target_number][bin//9,bin%9]+=1
+    def Update_Target_Bins(self,time,bins,target_number):
+        for bin in bins:
+            if self.target_bins[target_number][bin//9,bin%9] == 0:
+                self.target_times[target_number] = time[-1]
+            self.target_bins[target_number][bin//9,bin%9]+=1
         return 0
 
     def Compute_AzEl(self):
         self.Reset_Target_Bins()
-        self.Intervals = []
         with alive_bar(len(self.targets)*len(self.satellites),force_tty=True,bar='classic',title='- Computing_AzEl',length=10) as bar:
-            for tar_num,tar in enumerate(self.targets):
-                for sat_num,sat in enumerate(self.satellites):
+            for sat in self.satellites:
+                for tar_num,tar in enumerate(self.targets):
                     access = tar.GetAccessToObject(sat)
                     access.ComputeAccess()
-                    data_set = access.DataProviders.GetItemByName('AER Data').Group.Item(0).ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt,['Time','Azimuth','Elevation']).DataSets
-                    data = data_set.ToNumpyArray()
-                    if len(data) > 0:
-                        groups = data_set.Count//3
-                        for idx in range(groups):
-                            access_point = data[idx::groups]
-                            access_point = np.abs(access_point[access_point[:,0]!=None]).astype(float)
-                            I = Interval(access_point,tar_num,sat_num,self.Interpolate)
-                            self.Intervals.append(I)
-                            self.Update_Target_Bins(I)
+                    DataSets = access.DataProviders.GetItemByName('AER Data').Group.Item(0).ExecElements(self.root.CurrentScenario.StartTime,
+                                                                                                        self.root.CurrentScenario.StopTime,
+                                                                                                        self.dt,['Time','Azimuth','Elevation']).DataSets
+                    for idx in range(0,DataSets.Count,3):
+                        time = DataSets.Item(idx).GetValues()
+                        az = DataSets.Item(idx+1).GetValues()
+                        el = DataSets.Item(idx+2).GetValues()
+                        if self.Interpolate:
+                            time,az,el = Interpolate(time,az,el)
+                        bins = np.unique([(a//10)*9+(e//10) for a,e in zip(az,el)]).astype(int)
+                        self.Update_Target_Bins(time,bins,tar_num)
                     bar()
         return 0
     
