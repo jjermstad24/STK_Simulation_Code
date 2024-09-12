@@ -151,48 +151,112 @@ class STK_Simulation:
             self.constellation.Objects.AddObject(tar)
         return 0
     
-
-    def Create_Chain(self):
-        self.chain_name = 'Targets_to_Constellations'
-        self.chain = self.root.CurrentScenario.Children.New(AgESTKObjectType.eChain, self.chain_name)
+    def Constellation_and_Chain_Loader(self,pop,write=True):
+        for chain in self.root.CurrentScenario.Children.GetElements(AgESTKObjectType.eChain):
+            chain.Unload()
+        self.chain = self.root.CurrentScenario.Children.New(AgESTKObjectType.eChain,'Targets_to_Constellations')
         self.chain.AutoRecompute = False
-        return 0
-    
-    def Create_SatCon(self):
 
-        for con in range(len(self.satellites)//10 + 1):
-            self.constellation = self.root.CurrentScenario.Children.New(AgESTKObjectType.eConstellation, f"SatCon{con}")
-            self.root.ExecuteCommand(f'Chains */Chain/Targets_to_Constellations Connections Add from Constellation/TarCon to Constellation/{f"SatCon{con}"}')
+        self.constellations = []
+        for constellation in self.root.CurrentScenario.Children.GetElements(AgESTKObjectType.eConstellation):
+            constellation.Unload()
 
-        for sat_num, sat in enumerate(self.satellites):
-            sat_con_num = sat_num//10
-            self.constellation = self.root.CurrentScenario.Children.GetItemByName(f"SatCon{sat_con_num}")
-            self.constellation.Objects.AddObject(sat)
+        for satellite in self.root.CurrentScenario.Children.GetElements(AgESTKObjectType.eSatellite):
+            satellite.Unload()
 
-        
+        for satcon_num, sat_con_data in enumerate(pop):
+            Individual = sat_con_data
+            self.constellation = self.root.CurrentScenario.Children.New(AgESTKObjectType.eConstellation, f"SatCon_{satcon_num}")
+            self.constellations.append(self.constellation)
+            self.root.ExecuteCommand(f"Chains */Chain/Targets_to_Constellations Connections Add from Constellation/TarCon to Constellation/SatCon_{satcon_num}")
+
+            Alt = Individual[0]
+            Inc = Individual[1]
+            Aop = Individual[2]
+            num_sats = int(Individual[3])
+            num_planes = int(Individual[4])
+
+            if num_planes <= num_sats:
+                if write:
+                    file = open(f"Input_Files/SatCon_{satcon_num}.txt","w")
+                    file.write("Per,Apo,Inc,AoP,Asc,Loc,Tar\n")
+                    sats = num_sats*[1]
+                    planes = np.array_split(sats,num_planes)
+                    Asc = 0
+                    for plane in planes:
+                        Loc = 0
+                        for sat in plane:
+                            file.write(f"{Alt},{Alt},{Inc},{Aop},{round(Asc,4)},{round(Loc,4)},{1}\n")
+                            if len(plane)>1: Loc += 360/(len(plane)-1)
+                        if len(planes)>1:Asc += 180/(len(planes)-1)
+                    file.close()
+                constellation_filename = f"Input_Files/SatCon_{satcon_num}.txt"
+
+            self.satellites = []
+            self.radars = []
+
+            data = pd.read_csv(constellation_filename,delimiter=',')
+
+            for satellite_num in range(len(data)):
+                sat_num = satellite_num
+                sat_num += 100*satcon_num
+
+                sat = self.root.CurrentScenario.Children.New(AgESTKObjectType.eSatellite, f"Satellite_{sat_num}")
+                self.satellites.append(sat)
+
+                self.constellation.Objects.AddObject(sat)
+
+                # IAgSatellite satellite: Satellite object
+                keplerian = self.satellites[-1].Propagator.InitialState.Representation.ConvertTo(AgEOrbitStateType.eOrbitStateClassical)
+                keplerian.SizeShapeType = AgEClassicalSizeShape.eSizeShapeAltitude
+                keplerian.LocationType = AgEClassicalLocation.eLocationTrueAnomaly
+                keplerian.Orientation.AscNodeType = AgEOrientationAscNode.eAscNodeLAN
+
+                # Assign the perigee and apogee altitude values:
+                keplerian.SizeShape.PerigeeAltitude = float(data['Per'][satellite_num])      # km
+                keplerian.SizeShape.ApogeeAltitude = float(data['Apo'][satellite_num])        # km
+
+                # Assign the other desired orbital parameters:
+                keplerian.Orientation.Inclination = float(data['Inc'][satellite_num])               # deg
+                keplerian.Orientation.ArgOfPerigee = float(data['AoP'][satellite_num])        # deg
+                keplerian.Orientation.AscNode.Value = float(data['Asc'][satellite_num])            # deg
+                keplerian.Location.Value = float(data['Loc'][satellite_num])                             # deg
+
+                # Apply the changes made to the satellite's state and propagate:
+                self.satellites[-1].Propagator.InitialState.Representation.Assign(keplerian)
+                self.satellites[-1].Propagator.Propagate()
+
+                # IAgSatellite satellite: Satellite object
+                # self.radars[satellite_num] = self.satellites[satellite_num].Children.New(AgESTKObjectType.eRadar, f'Radar{i+1}')
+                # self.radars[satellite_num].CommonTasks.SetPatternSimpleConic(5, 0.1)
+                # self.radars[satellite_num].CommonTasks.SetPatternSAR(0,90,0,0,data['Per'][i])
+                # self.radars[satellite_num].SetPointingType(5)
+                # for j in self.targets:
+                #     self.radars[satellite_num].Pointing.Targets.Add(f'*/Target/{j}')
+
+
         self.root.ExecuteCommand(f"Chains */Chain/Targets_to_Constellations Connections SetStartInst Constellation/TarCon")
-        self.root.ExecuteCommand(f"Chains */Chain/Targets_to_Constellations Connections SetEndInst Constellation/SatCon{sat_con_num}")
-            
-        return 0
-
-    def Update_Chain(self):
-        self.root.ExecuteCommand(f'Chains */Chain/{self.chain_name} Connections Add from Constellation/TarCon to Constellation/{f"SatCon{i}"}')
+        self.root.ExecuteCommand(f"Chains */Chain/Targets_to_Constellations Connections SetEndInst Constellation/SatCon_{satcon_num}")
+                
 
     def Compute_Chain_AzEl(self):
         self.Reset_Target_Bins()
-        with alive_bar(1,force_tty=True,bar='classic',title='- Computing_Access_In_Parallel',length=3) as bar:
-            self.chain.ComputeAccess()
-            bar()
+        self.chain.ComputeAccess()
 
-        with alive_bar(len(self.targets),force_tty=True,bar='classic',title='- Computing_AzEl',length=10) as bar:
+        with alive_bar(len(self.constellations),force_tty=True,bar='classic',title='- Computing_AzEl',length=10) as bar:
             data_set = self.chain.DataProviders.GetItemByName("Access AER Data").ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt,['Time','Azimuth','Elevation', 'Strand Name']).DataSets
             data = data_set.ToNumpyArray()
-            for tar_num,tar in enumerate(self.targets):
-                tar_data = data[(data[:, 3] != None) & (np.char.find(data[:, 3].astype(str), f'Target_{tar_num} ') != -1)]
+            for satcon_num,sat in enumerate(self.constellations):
+                self.Reset_Target_Bins()
                 
-                if len(tar_data) > 0:
-                    self.bins = np.unique([int((az//10)*9) + int(el//10) for az,el in zip(tar_data[:,1].astype(float),tar_data[:,2].astype(float))])
-                    self.target_bins[tar_num][self.bins//9,self.bins%9]+=1
+                for tar_num,tar in enumerate(self.targets):
+                    tar_data = data[
+                    (np.char.find(data[:, 3].astype(str), f'Target_{tar_num} ') != -1) & (np.char.find(data[:, 3].astype(str), f'Satellite_{satcon_num}') != -1) ]
+                    if len(tar_data) > 0:
+                        self.bins = np.unique([int((az//10)*9) + int(el//10) for az,el in zip(tar_data[:,1].astype(float),tar_data[:,2].astype(float))])
+                        self.target_bins[tar_num][self.bins//9,self.bins%9]+=1
+                    self.percentages = [100*np.count_nonzero(self.target_bins[idx])/324 for idx in range(len(self.targets))]
+                    self.constellations[satcon_num]['Image']
                 bar()
         
 
