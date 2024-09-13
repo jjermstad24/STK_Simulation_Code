@@ -118,7 +118,7 @@ class STK_Simulation:
                     for idx in range(0,DataSets.Count,3):
                         time = DataSets.Item(idx).GetValues()
                         az = DataSets.Item(idx+1).GetValues()
-                        el = DataSets.Item(idx+2).GetValues()
+                        el = np.abs(DataSets.Item(idx+2).GetValues())
                         if self.Interpolate:
                             time,az,el = Interpolate(time,az,el)
                         bins = np.unique([(a//10)*9+(e//10) for a,e in zip(az,el)]).astype(int)
@@ -142,6 +142,36 @@ class STK_Simulation:
                 bar()
         return dfs
     
+    def Get_Access_DP(self,obs1,obs2,bus_name,Total_Elements=False):
+        dfs = []
+        splits = bus_name.split("/")
+        with alive_bar(len(self.satellites)*len(self.targets),force_tty=True,bar='classic',title=f'- Computing_{bus_name}',length=10) as bar:
+            for ob1 in obs1:
+                dfs.append([])
+                for ob2 in obs2:
+                    access = ob1.GetAccessToObject(ob2)
+                    access.ComputeAccess()
+                    if len(splits) == 2:
+                        bus = access.DataProviders.GetItemByName(splits[0]).Group.GetItemByName(splits[1])
+                    if len(splits) == 1:
+                        bus = access.DataProviders.GetItemByName(splits[0])
+                    df = {}
+                    if not(Total_Elements):
+                        DataSets = bus.Exec(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt).DataSets
+                        Elements = DataSets.ElementNames
+                    else:
+                        DataSets = bus.ExecElements(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt,Total_Elements).DataSets
+                        Elements = Total_Elements
+                    if len(Elements) > 0:
+                        for e in Elements:
+                            df[e] = []
+                        for idx in range(0,DataSets.Count,len(Elements)):
+                            for e_idx,e in enumerate(Elements):
+                                df[e].extend(DataSets.Item(idx+e_idx).GetValues())
+                        dfs[-1].append(df)
+                    bar()
+        return dfs
+
     def Update_Mass_Properties(self,M=250,I=[[288,0,0],
                                              [0,88.88,0],
                                              [0,0,288]]):

@@ -19,6 +19,7 @@ from IPython.display import clear_output
 import scipy.interpolate as interpolate
 import time
 import pointpats
+import re
 
 def Random_Decimal(t):
     lower,upper = t
@@ -206,7 +207,7 @@ class Optimizer:
         num_planes = int(Individual[4])
         if num_planes <= num_sats:
             if write:
-                file = open("Input_Files/Satellites_File.txt","w")
+                file = open("../../Input_Files/Satellites_File.txt","w")
                 file.write("Per,Apo,Inc,AoP,Asc,Loc,Tar\n")
                 sats = num_sats*[1]
                 planes = np.array_split(sats,num_planes)
