@@ -98,11 +98,10 @@ class STK_Simulation:
             self.target_bins[idx] = np.zeros([36,9])
             self.target_times[idx] = self.root.CurrentScenario.StopTime
 
-    def Update_Target_Bins(self,time,bins,target_number):
-        for bin in bins:
-            if self.target_bins[target_number][bin//9,bin%9] == 0:
-                self.target_times[target_number] = time[-1]
-            self.target_bins[target_number][bin//9,bin%9]+=1
+    def Update_Target_Bins(self,time,bin,target_number):
+        if self.target_bins[target_number][bin//9,bin%9] == 0:
+            self.target_times[target_number] = time
+        self.target_bins[target_number][bin//9,bin%9]+=1
         return 0
 
     def Compute_AzEl(self):
@@ -121,8 +120,9 @@ class STK_Simulation:
                         el = np.abs(DataSets.Item(idx+2).GetValues())
                         if self.Interpolate:
                             time,az,el = Interpolate(time,az,el)
-                        bins = np.unique([(a//10)*9+(e//10) for a,e in zip(az,el)]).astype(int)
-                        self.Update_Target_Bins(time,bins,tar_num)
+                        bins = [(a//10)*9+(e//10) for a,e in zip(az,el)].astype(int)
+                        for j in range(len(time)):
+                            self.Update_Target_Bins(time[j],bins[j],tar_num[j])
                     bar()
         return 0
     
@@ -182,3 +182,77 @@ class STK_Simulation:
             sat.MassProperties.Inertia.Iyy = I[1][1]
             sat.MassProperties.Inertia.Iyz = I[2][0]
             sat.MassProperties.Inertia.Izz = I[2][2]
+
+    def Generate_Planning_Data(self):
+        AER_Data = self.Get_Access_DP(self.targets,
+                                      self.satellites,
+                                      "AER Data/Default",
+                                      ['Access Number','Time','Azimuth','Elevation'])
+        Cross_Track = self.Get_Access_DP(self.satellites,
+                                         self.targets,
+                                         "Sat Angles Data",
+                                         ["Cross Track"])
+        
+        self.Planning_Data = {key:[] for key in AER_Data[0][0]}
+        self.Planning_Data['Satellite'] = []
+        self.Planning_Data['Target'] = []
+        self.Planning_Data['Cross Track'] = []
+
+        for tar_num,tar in enumerate(self.targets):
+            data_holder = AER_Data[tar_num].copy()
+            for sat_num,df in enumerate(data_holder):
+                df['Elevation'] = np.abs(df['Elevation'])
+                df['Target'] = tar_num*np.ones_like(df[list(df.keys())[0]]).astype(int)
+                df['Satellite'] = sat_num*np.ones_like(df[list(df.keys())[0]]).astype(int)
+                df['Cross Track'] = Cross_Track[sat_num][tar_num]['Cross Track']
+                for key in self.Planning_Data:
+                    self.Planning_Data[key].extend(df[key])
+
+        bins = []
+        for idx in range(len(self.Planning_Data['Target'])):
+            az = self.Planning_Data['Azimuth'][idx]
+            el = self.Planning_Data['Elevation'][idx]
+            bins.append(int(az//10*9+el//10))
+            self.Update_Target_Bins(self.Planning_Data['Time'][idx],bins[-1],self.Planning_Data['Target'][idx])
+
+        self.Planning_Data["Bin Number"] = bins
+        self.Planning_Data = pd.DataFrame(self.Planning_Data).sort_values(by="Time")
+
+        self.hash_map = {}
+        for tar_num in range(len(self.targets)):
+            self.hash_map[tar_num] = {}
+            tar_window = self.Planning_Data['Target'].values==tar_num
+            for bin_num in range(324):
+                bin_window = self.Planning_Data['Bin Number'].values==bin_num
+                self.hash_map[tar_num][bin_num] = np.array([self.Planning_Data['Time'].values[bin_window&tar_window],
+                                                    self.Planning_Data['Satellite'].values[bin_window&tar_window].astype(int),
+                                                    self.Planning_Data['Cross Track'].values[bin_window&tar_window]]).T
+        return 0
+        
+
+    def Plan_Data(self,slew_rate):
+        Planned_Data = {key:{} for key in range(len(self.targets))}
+        bins = np.reshape([[[count,tar_num,bin_num] for bin_num,count in enumerate(tar_bin.ravel())] for tar_num,tar_bin in enumerate(self.target_bins)],[len(self.targets)*324,3]).astype(int)
+        with alive_bar(324*len(self.targets),force_tty=True,bar='classic',title=f'- Planning_Data',length=10) as bar:
+            for count,tar_num,bin_num in bins[bins[:,0].argsort()]:
+                if count > 0:
+                    result = get_earliest_available_access(Planned_Data,self.hash_map[tar_num][bin_num],slew_rate)
+                    if type(result)!=bool:
+                        Planned_Data[tar_num][bin_num] = (result[0],result[1],result[2])
+                bar()
+        
+        Times = []
+        Sats = []
+        Angles = []
+        Targets = []
+        Bins = []
+        for tar_num in Planned_Data:
+            for bin_num in Planned_Data[tar_num]:
+                Times.append(Planned_Data[tar_num][bin_num][0])
+                Sats.append(Planned_Data[tar_num][bin_num][1])
+                Angles.append(Planned_Data[tar_num][bin_num][2])
+                Targets.append(tar_num)
+                Bins.append(bin_num)
+
+        self.Planned_Data = pd.DataFrame({"Time":Times,"Satellite":Sats,"Target":Targets,"Cross Track":Angles,"Bin Number":Bins})
+        return 0
