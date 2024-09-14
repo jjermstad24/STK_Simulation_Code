@@ -257,3 +257,25 @@ def Interpolate(time,az,el):
         ans = interpolate.interp1d(x=time,y=[np.unwrap(az,period=360),el],kind='quadratic')(times).T
         az_t = ans[:,0]%360;el_t = ans[:,1]
     return times,az_t,el_t
+
+def check_manueverability(time1,sat1,theta1,time2,sat2,theta2,slew_rate):
+    dtheta = np.abs(theta2-theta1)
+    dtime = time2-time1
+    rate_cond = np.divide(dtheta,dtime,out=np.zeros_like(dtime),where=dtime!=0)<slew_rate
+    sat_cond = sat1!=sat2
+    return sat_cond|rate_cond
+
+def get_earliest_available_access(Planning_Data,data,slew_rate):
+    available_indexes = np.ones_like(data[:,0])
+    if len(data)>0:
+        for tar_num in Planning_Data.keys():
+            for bin_num in Planning_Data[tar_num].keys():
+                feasibility = check_manueverability(Planning_Data[tar_num][bin_num][0],Planning_Data[tar_num][bin_num][1],Planning_Data[tar_num][bin_num][2],data[:,0],data[:,1],data[:,2],slew_rate)
+                available_indexes = available_indexes*feasibility
+        available_indexes = list(available_indexes.astype(bool))
+        if True in available_indexes:
+            return data[available_indexes][0]
+        else:
+            return False
+    else:
+        return False
