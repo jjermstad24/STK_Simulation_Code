@@ -266,16 +266,20 @@ def check_manueverability(time1,sat1,theta1,time2,sat2,theta2,slew_rate):
     return sat_cond|rate_cond
 
 def get_earliest_available_access(Planning_Data,data,slew_rate):
-    available_indexes = np.ones_like(data[:,0])
     if len(data)>0:
+        times = []
+        sats = []
+        angles = []
         for tar_num in Planning_Data.keys():
             for bin_num in Planning_Data[tar_num].keys():
-                feasibility = check_manueverability(Planning_Data[tar_num][bin_num][0],Planning_Data[tar_num][bin_num][1],Planning_Data[tar_num][bin_num][2],data[:,0],data[:,1],data[:,2],slew_rate)
-                available_indexes = available_indexes*feasibility
-        available_indexes = list(available_indexes.astype(bool))
-        if True in available_indexes:
-            return data[available_indexes][0]
+                times.append(Planning_Data[tar_num][bin_num][0])
+                sats.append(Planning_Data[tar_num][bin_num][1])
+                angles.append(Planning_Data[tar_num][bin_num][2])
+        if len(times) > 0:
+            feasibility = check_manueverability(np.array(times)[:,np.newaxis],np.array(sats)[:,np.newaxis],np.array(angles)[:,np.newaxis],data[:,0],data[:,1],data[:,2],slew_rate)
+            indexes = np.where(np.all(feasibility,axis=0))[0]
+            if len(indexes) > 0:
+                return data[indexes[0]]
         else:
-            return False
-    else:
-        return False
+            return data[0]
+    return False

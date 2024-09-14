@@ -240,7 +240,7 @@ class STK_Simulation:
                     if type(result)!=bool:
                         Planned_Data[tar_num][bin_num] = (result[0],result[1],result[2])
                 bar()
-        
+                
         Times = []
         Sats = []
         Angles = []
