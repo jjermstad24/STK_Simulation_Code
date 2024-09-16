@@ -56,6 +56,10 @@ def Create_Poly(filename):
         l.append((df['Lat'][i],df['Lon'][i]))
     return Polygon(l)
 
+def get_ind():
+    df = pd.read_csv("../../Input_Files/Satellites_File.txt")
+    return [df["Per"].values[0],df["Inc"].values[0],df["AoP"].values[0],len(df),len(np.unique(df["Asc"]))]
+
 def polygon_random_points (poly, num_points,targets_filename):
     points = pointpats.random.poisson(poly, size=num_points)
     return pd.DataFrame({'Lat':points[:,1],'Lon':points[:,0]}).dropna().to_csv(targets_filename,index=False)
@@ -91,12 +95,12 @@ def Pointing_File_Generator(filename,period):
     f.write('End Attitude')
     f.close()
 class Optimizer:
-    def __init__(self,stk_object,n_pop,n_gen,n_sats):
+    def __init__(self,stk_object,n_pop,n_gen,n_sats,weights = (7.0,-7.0,-1.0,-2.0)):
         self.stk_object = stk_object
         self.n_pop = n_pop
         self.n_gen = n_gen
         self.n_sats = n_sats
-        creator.create("FitnessMax", base.Fitness, weights=(7.0,-1.0,-2.0))
+        creator.create("FitnessMax", base.Fitness, weights=weights)
         creator.create("Satellite", list, fitness=creator.FitnessMax)
         self.lower = [575,0,0,1,1]
         self.upper = [630,180,180,self.n_sats,self.n_sats]
@@ -120,7 +124,8 @@ class Optimizer:
         # Registering tools for the algorithm
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.satellite)
         self.toolbox.register("evaluate", self.cost_function)
-        self.toolbox.register("mate", tools.cxSimulatedBinaryBounded,eta=0.75,low=[x for x in self.lower],up=[x for x in self.upper])
+        # self.toolbox.register("mate", tools.cxSimulatedBinaryBounded,eta=0.75,low=[x for x in self.lower],up=[x for x in self.upper])
+        self.toolbox.register("mate", tools.cxUniform,indpb=0.3)
         self.toolbox.register("mutate", tools.mutUniformInt, low=[x for x in self.lower],up=[x for x in self.upper], indpb=0.3)
         self.toolbox.register("select", tools.selTournament, tournsize=3)
         self.stats = tools.Statistics(key=lambda ind: ind.fitness.values)
@@ -129,39 +134,43 @@ class Optimizer:
         self.stats.register("min", np.min, axis=0)
         self.stats.register("max", np.max, axis=0)
 
-    def run(self):
+    def run(self,ind=False):
         self.fits = []
         CXPB = 0.7;MUTPB=0.3
-        clear_output(wait=False)
         g = 0
         # Creating a population to evolve
         pop = self.toolbox.population(n=self.n_pop)
-        print("-- Generation %i --" % g)
+        i = np.random.randint(0,self.n_pop)
+        if type(ind)!=bool:
+            for idx in range(len(pop[0])):
+                pop[i][idx] = ind[idx]
+
         fitnesses = list(map(self.toolbox.evaluate, pop))
         for ind, fit in zip(pop, fitnesses):
             ind.fitness.values = fit
         hof = tools.HallOfFame(5)
         hof.update(pop)
 
+        print(pop[i])
+        print(pop[i].fitness)
+
         percent = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
+        std =  {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
         time = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
         sats = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
 
         self.fits.append([ind.fitness.values for ind in pop])
         record = self.stats.compile(pop)
+
+        clear_output(wait=False)
+        print("-- Generation %i --" % g)
         print(pd.DataFrame(record))
-        for idx,df in enumerate([percent,time,sats]):
-            df['Gen'].append(g)
-            df['avg'].append(record['avg'][idx])
-            df['std'].append(record['std'][idx])
-            df['min'].append(record['min'][idx])
-            df['max'].append(record['max'][idx])
 
         # Begin the evolution
         while g < self.n_gen:
             # clear_output(wait=True)
             g = g + 1
-            print("-- Generation %i --" % g)
+
             # A new generation
             # Select the next generation individuals
             offspring = self.toolbox.select(pop, len(pop))
@@ -189,17 +198,13 @@ class Optimizer:
 
             self.fits.append([ind.fitness.values for ind in pop])
             record = self.stats.compile(pop)
+
+            clear_output(wait=False)
+            print("-- Generation %i --" % g)
             print(pd.DataFrame(record))
-            for idx,df in enumerate([percent,time,sats]):
-                df['Gen'].append(g)
-                df['avg'].append(record['avg'][idx])
-                df['std'].append(record['std'][idx])
-                df['min'].append(record['min'][idx])
-                df['max'].append(record['max'][idx])
-        print("------------------------------------------------------------------------")
-        return hof,percent,time,sats
+        return hof,percent,std,time,sats
     
-    def cost_function(self,Individual=[0,0,0,0,0],write=True):
+    def cost_function(self,Individual=[0,0,0,0,0],write=True,enable_print=False):
         Alt = Individual[0]
         Inc = Individual[1]
         Aop = Individual[2]
@@ -219,35 +224,15 @@ class Optimizer:
                         if len(plane)>1: Loc += 360/(len(plane)-1)
                     if len(planes)>1:Asc += 180/(len(planes)-1)
                 file.close()
-            satellites_filename = 'Input_Files/Satellites_File.txt'
+            satellites_filename = '../../Input_Files/Satellites_File.txt'
             self.stk_object.Satellite_Loader(satellites_filename)
-            print("------------------------------------------------------------------------")
-            self.stk_object.Compute_AzEl()
-            percentages = [100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))]
-            times = [self.stk_object.target_times[idx]/86400 for idx in range(len(self.stk_object.targets))]
-            return np.average(percentages),np.max(times),len(self.stk_object.satellites)
+            self.stk_object.Compute_AzEl(enable_print)
+            percentages = np.array([100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))])
+            times = np.array([self.stk_object.target_times[idx]/3600 for idx in range(len(self.stk_object.targets))])
+            return np.average(percentages),np.std(percentages),max(times),len(self.stk_object.satellites)
         else:
-            return 0,self.stk_object.root.CurrentScenario.StopTime/86400,12
+            return 0,0,self.stk_object.root.CurrentScenario.StopTime/3600,12
         
-class Interval:
-    def __init__(self,access_point,target_number,satellite_number,Interpolate=True):
-        self.start = access_point[0,0]
-        self.stop = access_point[-1,0]
-        self.target_number = target_number
-        self.satellite_number = satellite_number
-        if Interpolate:
-            times = np.arange(self.start,self.stop,2.5)
-            if max(access_point[:,2])>=60 and len(access_point[:,0])>3:
-                az_t = interpolate.interpn(points=[access_point[:,0]],values=np.array([np.unwrap(access_point[:,1],period=360)]).T,xi=times,method='pchip')[:,0]%360
-                el_t = interpolate.interp1d(x=access_point[:,0],y=[access_point[:,2]],kind='cubic')(times)[0]
-            else:
-                ans = interpolate.interp1d(x=access_point[:,0],y=[np.unwrap(access_point[:,1],period=360),access_point[:,2]],kind='quadratic')(times).T
-                az_t = ans[:,0]%360;el_t = ans[:,1]
-            
-            self.bins = np.unique([int(az//10)*9+int(el//10) for az,el in zip(az_t,el_t)])
-        else:
-            self.bins = np.unique([int(az//10)*9+int(el//10) for az,el in zip(access_point[:,1],access_point[:,2])])
-
 def Interpolate(time,az,el):
     times = np.arange(time[0],time[-1],2.5)
     if max(el)>=60 and len(time)>3:
@@ -260,7 +245,7 @@ def Interpolate(time,az,el):
 
 def check_manueverability(time1,sat1,theta1,time2,sat2,theta2,slew_rate):
     dtheta = np.abs(theta2-theta1)
-    dtime = time2-time1
+    dtime = np.abs(time2-time1)
     rate_cond = np.divide(dtheta,dtime,out=np.zeros_like(dtime),where=dtime!=0)<slew_rate
     sat_cond = sat1!=sat2
     return sat_cond|rate_cond

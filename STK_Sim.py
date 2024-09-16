@@ -104,9 +104,9 @@ class STK_Simulation:
         self.target_bins[target_number][bin//9,bin%9]+=1
         return 0
 
-    def Compute_AzEl(self):
+    def Compute_AzEl(self,enable_print=True):
         self.Reset_Target_Bins()
-        with alive_bar(len(self.targets)*len(self.satellites),force_tty=True,bar='classic',title='- Computing_AzEl',length=10) as bar:
+        with alive_bar(len(self.targets)*len(self.satellites),force_tty=True,bar='classic',title='- Computing_AzEl',length=10,disable=not(enable_print)) as bar:
             for sat in self.satellites:
                 for tar_num,tar in enumerate(self.targets):
                     access = tar.GetAccessToObject(sat)
@@ -120,16 +120,16 @@ class STK_Simulation:
                         el = np.abs(DataSets.Item(idx+2).GetValues())
                         if self.Interpolate:
                             time,az,el = Interpolate(time,az,el)
-                        bins = [(a//10)*9+(e//10) for a,e in zip(az,el)].astype(int)
+                        bins = np.array([(a//10)*9+(e//10) for a,e in zip(az,el)]).astype(int)
                         for j in range(len(time)):
-                            self.Update_Target_Bins(time[j],bins[j],tar_num[j])
+                            self.Update_Target_Bins(time[j],bins[j],tar_num)
                     bar()
         return 0
     
-    def Get_Satellite_DP(self,bus_name):
+    def Get_Satellite_DP(self,bus_name,enable_print=True):
         dfs = []
         splits = bus_name.split("/")
-        with alive_bar(len(self.satellites),force_tty=True,bar='classic',title=f'- Computing_{bus_name}',length=10) as bar:
+        with alive_bar(len(self.satellites),force_tty=True,bar='classic',title=f'- Computing_{bus_name}',length=10,disable=not(enable_print)) as bar:
             for sat in self.satellites:
                 if len(splits) == 2:
                     bus = sat.DataProviders.GetItemByName(splits[0]).Group.GetItemByName(splits[1])
@@ -142,10 +142,10 @@ class STK_Simulation:
                 bar()
         return dfs
     
-    def Get_Access_DP(self,obs1,obs2,bus_name,Total_Elements=False):
+    def Get_Access_DP(self,obs1,obs2,bus_name,Total_Elements=False,enable_print=True):
         dfs = []
         splits = bus_name.split("/")
-        with alive_bar(len(self.satellites)*len(self.targets),force_tty=True,bar='classic',title=f'- Computing_{bus_name}',length=10) as bar:
+        with alive_bar(len(self.satellites)*len(self.targets),force_tty=True,bar='classic',title=f'- Computing_{bus_name}',length=10,disable=not(enable_print)) as bar:
             for ob1 in obs1:
                 dfs.append([])
                 for ob2 in obs2:
@@ -187,7 +187,7 @@ class STK_Simulation:
         AER_Data = self.Get_Access_DP(self.targets,
                                       self.satellites,
                                       "AER Data/Default",
-                                      ['Access Number','Time','Azimuth','Elevation'])
+                                      ['Time','Azimuth','Elevation'])
         Cross_Track = self.Get_Access_DP(self.satellites,
                                          self.targets,
                                          "Sat Angles Data",
@@ -225,8 +225,8 @@ class STK_Simulation:
             for bin_num in range(324):
                 bin_window = self.Planning_Data['Bin Number'].values==bin_num
                 self.hash_map[tar_num][bin_num] = np.array([self.Planning_Data['Time'].values[bin_window&tar_window],
-                                                    self.Planning_Data['Satellite'].values[bin_window&tar_window].astype(int),
-                                                    self.Planning_Data['Cross Track'].values[bin_window&tar_window]]).T
+                                                            self.Planning_Data['Satellite'].values[bin_window&tar_window].astype(int),
+                                                            self.Planning_Data['Cross Track'].values[bin_window&tar_window]]).T
         return 0
         
 
