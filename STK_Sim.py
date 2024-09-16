@@ -184,15 +184,16 @@ class STK_Simulation:
                                       self.satellites,
                                       "AER Data/Default",
                                       ['Time','Azimuth','Elevation'])
-        Cross_Track = self.Get_Access_DP(self.satellites,
-                                         self.targets,
-                                         "Sat Angles Data",
-                                         ["Cross Track"])
+        Sat_Angles_Data = self.Get_Access_DP(self.satellites,
+                                             self.targets,
+                                             "Sat Angles Data",
+                                             ["Cross Track","Along Track"])
         
         self.Holding_Data = {key:[] for key in AER_Data[0][0]}
         self.Holding_Data['Satellite'] = []
         self.Holding_Data['Target'] = []
         self.Holding_Data['Cross Track'] = []
+        self.Holding_Data['Along Track'] = []
 
         for tar_num,tar in enumerate(self.targets):
             data_holder = AER_Data[tar_num].copy()
@@ -200,7 +201,8 @@ class STK_Simulation:
                 df['Elevation'] = np.abs(df['Elevation'])
                 df['Target'] = tar_num*np.ones_like(df[list(df.keys())[0]]).astype(int)
                 df['Satellite'] = sat_num*np.ones_like(df[list(df.keys())[0]]).astype(int)
-                df['Cross Track'] = Cross_Track[sat_num][tar_num]['Cross Track']
+                df['Cross Track'] = Sat_Angles_Data[sat_num][tar_num]['Cross Track']
+                df['Along Track'] = Sat_Angles_Data[sat_num][tar_num]['Along Track']
                 for key in self.Holding_Data:
                     self.Holding_Data[key].extend(df[key])
 
@@ -223,34 +225,43 @@ class STK_Simulation:
                 bin_window = self.Holding_Data['Bin Number'].values==bin_num
                 self.hash_map[tar_num][bin_num] = np.array([self.Holding_Data['Time'].values[bin_window&tar_window],
                                                             self.Holding_Data['Satellite'].values[bin_window&tar_window].astype(int),
-                                                            self.Holding_Data['Cross Track'].values[bin_window&tar_window]]).T
+                                                            self.Holding_Data['Cross Track'].values[bin_window&tar_window],
+                                                            self.Holding_Data['Along Track'].values[bin_window&tar_window]]).T
         return 0
         
-    def Plan(self,slew_rate):
-        satellite_specific_plan = {key:{"Time":[],"Target":[],"Bin Number":[],"Cross Range":[]} for key in range(len(self.satellites))}
+    def Plan(self,slew_rate,cone_angle):
+        satellite_specific_plan = {key:{"Time":[],"Target":[],"Bin Number":[],"Cross Range":[],"Along Range":[]} for key in range(len(self.satellites))}
         bins = np.reshape([[[count,tar_num,bin_num] for bin_num,count in enumerate(tar_bin.ravel())] for tar_num,tar_bin in enumerate(self.target_bins)],[len(self.targets)*324,3]).astype(int)
         with alive_bar(324*len(self.targets),force_tty=True,bar='classic',title=f'- Holding_Data',length=10) as bar:
             for count,tar_num,bin_num in bins[bins[:,0].argsort()]:
                 if count > 0:
-                    result = get_earliest_available_access(satellite_specific_plan,self.hash_map[tar_num][bin_num],slew_rate)
+                    result = get_best_available_access(satellite_specific_plan,self.hash_map[tar_num][bin_num],slew_rate,cone_angle)
                     if type(result)!=bool:
                         satellite_specific_plan[result[1]]["Time"].append(result[0])
                         satellite_specific_plan[result[1]]["Target"].append(tar_num)
                         satellite_specific_plan[result[1]]["Bin Number"].append(bin_num)
                         satellite_specific_plan[result[1]]["Cross Range"].append(result[2])
+                        satellite_specific_plan[result[1]]["Along Range"].append(result[3])
                 bar()
                 
         Times = []
         Sats = []
-        Angles = []
+        Cross_Range = []
+        Along_Range = []
         Targets = []
         Bins = []
         for sat_num in satellite_specific_plan:
             Times.extend(satellite_specific_plan[sat_num]["Time"])
             Sats.extend(len(satellite_specific_plan[sat_num]["Time"])*[sat_num])
-            Angles.extend(satellite_specific_plan[sat_num]["Cross Range"])
+            Cross_Range.extend(satellite_specific_plan[sat_num]["Cross Range"])
+            Along_Range.extend(satellite_specific_plan[sat_num]["Along Range"])
             Targets.extend(satellite_specific_plan[sat_num]["Target"])
             Bins.extend(satellite_specific_plan[sat_num]["Bin Number"])
 
-        self.Planned_Data = pd.DataFrame({"Time":Times,"Satellite":Sats,"Target":Targets,"Cross Track":Angles,"Bin Number":Bins})
+        self.Planned_Data = pd.DataFrame({"Time":Times,
+                                          "Satellite":Sats,
+                                          "Target":Targets,
+                                          "Cross Track":Cross_Range,
+                                          "Along Track":Along_Range,
+                                          "Bin Number":Bins})
         return 0

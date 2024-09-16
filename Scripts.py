@@ -236,24 +236,55 @@ def Interpolate(time,az,el):
         az_t = ans[:,0]%360;el_t = ans[:,1]
     return times,az_t,el_t
 
-def check_manueverability(previous_times,previous_theta,new_time,new_theta,slew_rate):
+def check_manueverability(previous_times,
+                          previous_crossrange,
+                          previous_alongrange,
+                          new_time,
+                          new_crossrange,
+                          new_along_range,
+                          slew_rate,
+                          cone_angle):
     if len(previous_times)>0:
-        dtheta = np.abs(new_theta-previous_theta)
-        dtime = np.abs(new_time-previous_times)
-        rate_cond = np.divide(dtheta,dtime,out=slew_rate*np.ones_like(dtime),where=dtime!=0)<slew_rate
-        return rate_cond
+        d_crossrange_1 = np.abs(previous_crossrange)-cone_angle
+        d_crossrange_1[d_crossrange_1<0] = 0
+        d_crossrange_1 *= np.sign(previous_crossrange)
+
+        d_alongrange_1 = np.abs(previous_alongrange)-cone_angle
+        d_alongrange_1[d_alongrange_1<0] = 0
+        d_alongrange_1 *= np.sign(previous_alongrange)
+
+        d_crossrange_2 = abs(new_crossrange)-cone_angle
+        if d_crossrange_2 < 0:
+            d_crossrange_2 = 0
+        d_crossrange_2 *= np.sign(new_crossrange)
+
+        d_alongrange_2 = abs(new_along_range)-cone_angle
+        if d_alongrange_2 < 0:
+            d_alongrange_2 = 0
+        d_alongrange_2 *= np.sign(new_along_range)
+
+        d_time = np.abs(new_time-previous_times)
+
+        slew_cond = np.abs(np.linalg.norm([np.divide(d_crossrange_1+d_crossrange_2,d_time,out=slew_rate*np.ones_like(d_time),where=d_time!=0),
+                                           np.divide(d_alongrange_1+d_alongrange_2,d_time,out=slew_rate*np.ones_like(d_time),where=d_time!=0)],axis=0))<slew_rate
+        # slew_cond = (np.abs(np.divide(d_crossrange_1+d_crossrange_2,d_time,out=slew_rate*np.ones_like(d_time),where=d_time!=0))+np.abs(np.divide(d_alongrange_1+d_alongrange_2,d_time,out=slew_rate*np.ones_like(d_time),where=d_time!=0)))<slew_rate
+        
+        return slew_cond
     else:
         return [[True]]
 
-def get_earliest_available_access(satellite_specific_plan,bin_access_points,slew_rate):
+def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rate,cone_angle):
     if len(bin_access_points)>0:
         for idx in range(len(bin_access_points)):
             previous_sat_accesses = satellite_specific_plan[int(bin_access_points[idx,1])]
-            feasible = check_manueverability(np.array(previous_sat_accesses["Time"])[:,np.newaxis],
-                                             np.array(previous_sat_accesses["Cross Range"])[:,np.newaxis],
+            feasible = check_manueverability(np.array(previous_sat_accesses["Time"]),
+                                             np.array(previous_sat_accesses["Cross Range"]),
+                                             np.array(previous_sat_accesses["Along Range"]),
                                              bin_access_points[idx,0],
                                              bin_access_points[idx,2],
-                                             slew_rate)
+                                             bin_access_points[idx,3],
+                                             slew_rate,
+                                             cone_angle)
             if np.all(feasible):
                 return bin_access_points[idx]
     return False
