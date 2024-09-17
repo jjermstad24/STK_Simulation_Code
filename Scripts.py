@@ -254,7 +254,7 @@ def check_manueverability(previous_times,
 
         d_time = np.abs(new_time-previous_times)
                                                    
-        return np.divide(d_theta_1+d_theta_2,d_time,out=slew_rate*np.ones_like(d_time),where=d_time!=0)<slew_rate
+        return np.divide(d_theta_1+d_theta_2,d_time,out=slew_rate*np.ones_like(d_time),where=d_time!=0)<=slew_rate
     else:
         return [[True]]
 
