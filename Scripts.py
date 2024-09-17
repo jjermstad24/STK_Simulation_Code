@@ -20,6 +20,7 @@ import scipy.interpolate as interpolate
 import time
 import pointpats
 import re
+import openpyxl
 
 def Random_Decimal(t):
     lower,upper = t
@@ -288,3 +289,20 @@ def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rat
             if np.all(feasible):
                 return bin_access_points[idx]
     return False
+
+def dfs_to_excel(excel_file, sheet_name,df1 = pd.read_csv("../../Input_Files/Satellites_File.txt"), df2 = False):
+    workbook = openpyxl.load_workbook(excel_file)
+    if sheet_name in workbook.sheetnames:
+        sheet = workbook[sheet_name]
+    else:
+        sheet = workbook.create_sheet(sheet_name)
+    for i, row in df1.iterrows():
+        for j, key in enumerate(df1.columns):
+            sheet.cell(row=1, column=j+1).value = key
+            sheet.cell(row=i+2, column=j+1).value = row[key]  # Write the value of the column 'key' at the appropriate cell
+    for i, row in df2.iterrows():
+        for j, key in enumerate(df2.columns):
+            sheet.cell(row=1, column=j+len(df1.columns)+2).value = key
+            sheet.cell(row=i+2, column=j+len(df1.columns)+2).value = row[key]
+
+    workbook.save(excel_file)
