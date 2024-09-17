@@ -95,15 +95,15 @@ def Pointing_File_Generator(filename,period):
     f.write('End Attitude')
     f.close()
 class Optimizer:
-    def __init__(self,stk_object,n_pop,n_gen,n_sats,weights = (7.0,-7.0,-1.0,-2.0)):
+    def __init__(self,stk_object,n_pop,n_gen,n_sats,weights = (7.0,-7.0,-1.0)):
         self.stk_object = stk_object
         self.n_pop = n_pop
         self.n_gen = n_gen
         self.n_sats = n_sats
         creator.create("FitnessMax", base.Fitness, weights=weights)
         creator.create("Satellite", list, fitness=creator.FitnessMax)
-        self.lower = [575,0,0,1,1]
-        self.upper = [630,180,180,self.n_sats,self.n_sats]
+        self.lower = [575,0,0,1]
+        self.upper = [630,180,180,self.n_sats]
 
         # Registering variables to the satellite
         self.toolbox = base.Toolbox()
@@ -111,39 +111,36 @@ class Optimizer:
         self.toolbox.register("attr_inc", random.randint, self.lower[1], self.upper[1])
         self.toolbox.register("attr_aop", random.randint, self.lower[2], self.upper[2])
         self.toolbox.register("attr_num_planes", random.randint, self.lower[3], self.upper[3])
-        self.toolbox.register("attr_sat_per_plane", random.randint, self.lower[4], self.upper[4])
 
         # Registering satellite to the model
         self.toolbox.register("satellite", tools.initCycle, creator.Satellite,
                         (self.toolbox.attr_alt,
                         self.toolbox.attr_inc,
                         self.toolbox.attr_aop,
-                        self.toolbox.attr_num_planes,
-                        self.toolbox.attr_sat_per_plane), n=1)
+                        self.toolbox.attr_num_planes), n=1)
 
         # Registering tools for the algorithm
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.satellite)
         self.toolbox.register("evaluate", self.cost_function)
-        # self.toolbox.register("mate", tools.cxSimulatedBinaryBounded,eta=0.75,low=[x for x in self.lower],up=[x for x in self.upper])
-        self.toolbox.register("mate", tools.cxUniform,indpb=0.3)
-        self.toolbox.register("mutate", tools.mutUniformInt, low=[x for x in self.lower],up=[x for x in self.upper], indpb=0.3)
-        self.toolbox.register("select", tools.selTournament, tournsize=3)
+        self.toolbox.register("mate", tools.cxUniform,indpb=0.5)
+        self.toolbox.register("mutate", tools.mutUniformInt, low=self.lower,up=self.upper, indpb=0.5)
+        self.toolbox.register("select", tools.selTournament, tournsize=int(self.n_pop//2))
         self.stats = tools.Statistics(key=lambda ind: ind.fitness.values)
         self.stats.register("avg", np.mean, axis=0)
         self.stats.register("std", np.std, axis=0)
         self.stats.register("min", np.min, axis=0)
         self.stats.register("max", np.max, axis=0)
 
-    def run(self,ind=False):
+    def run(self,read=False):
         self.fits = []
         CXPB = 0.7;MUTPB=0.3
         g = 0
         # Creating a population to evolve
         pop = self.toolbox.population(n=self.n_pop)
         i = np.random.randint(0,self.n_pop)
-        if type(ind)!=bool:
-            for idx in range(len(pop[0])):
-                pop[i][idx] = ind[idx]
+        if read:
+            for idx in range(4):
+                pop[i][idx] = get_ind()[idx]
 
         fitnesses = list(map(self.toolbox.evaluate, pop))
         for ind, fit in zip(pop, fitnesses):
@@ -157,7 +154,6 @@ class Optimizer:
         percent = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
         std =  {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
         time = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
-        sats = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
 
         self.fits.append([ind.fitness.values for ind in pop])
         record = self.stats.compile(pop)
@@ -202,36 +198,33 @@ class Optimizer:
             clear_output(wait=False)
             print("-- Generation %i --" % g)
             print(pd.DataFrame(record))
-        return hof,percent,std,time,sats
+        return hof,percent,std,time
     
     def cost_function(self,Individual=[0,0,0,0,0],write=True,enable_print=False):
         Alt = Individual[0]
         Inc = Individual[1]
         Aop = Individual[2]
-        num_sats = int(Individual[3])
-        num_planes = int(Individual[4])
-        if num_planes <= num_sats:
-            if write:
-                file = open("../../Input_Files/Satellites_File.txt","w")
-                file.write("Per,Apo,Inc,AoP,Asc,Loc,Tar\n")
-                sats = num_sats*[1]
-                planes = np.array_split(sats,num_planes)
-                Asc = 0
-                for plane in planes:
-                    Loc = 0
-                    for sat in plane:
-                        file.write(f"{Alt},{Alt},{Inc},{Aop},{round(Asc,4)},{round(Loc,4)},{1}\n")
-                        if len(plane)>1: Loc += 360/(len(plane)-1)
-                    if len(planes)>1:Asc += 180/(len(planes)-1)
-                file.close()
-            satellites_filename = '../../Input_Files/Satellites_File.txt'
-            self.stk_object.Satellite_Loader(satellites_filename)
-            self.stk_object.Compute_AzEl(enable_print)
-            percentages = np.array([100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))])
-            times = np.array([self.stk_object.target_times[idx]/3600 for idx in range(len(self.stk_object.targets))])
-            return np.average(percentages),np.std(percentages),max(times),len(self.stk_object.satellites)
-        else:
-            return 0,0,self.stk_object.root.CurrentScenario.StopTime/3600,12
+        num_planes = int(Individual[3])
+        num_sats = self.n_sats
+        if write:
+            file = open("../../Input_Files/Satellites_File.txt","w")
+            file.write("Per,Apo,Inc,AoP,Asc,Loc,Tar\n")
+            sats = num_sats*[1]
+            planes = np.array_split(sats,num_planes)
+            Asc = 0
+            for plane in planes:
+                Loc = 0
+                for sat in plane:
+                    file.write(f"{Alt},{Alt},{Inc},{Aop},{round(Asc,4)},{round(Loc,4)},{1}\n")
+                    if len(plane)>1: Loc += 360/(len(plane)-1)
+                if len(planes)>1:Asc += 180/(len(planes)-1)
+            file.close()
+        satellites_filename = '../../Input_Files/Satellites_File.txt'
+        self.stk_object.Satellite_Loader(satellites_filename)
+        self.stk_object.Compute_AzEl(enable_print)
+        percentages = np.array([100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))])
+        times = np.array([self.stk_object.target_times[idx]/3600 for idx in range(len(self.stk_object.targets))])
+        return np.average(percentages),np.std(percentages),max(times)
         
 def Interpolate(time,az,el):
     times = np.arange(time[0],time[-1],2.5)
@@ -243,28 +236,55 @@ def Interpolate(time,az,el):
         az_t = ans[:,0]%360;el_t = ans[:,1]
     return times,az_t,el_t
 
-def check_manueverability(time1,sat1,theta1,time2,sat2,theta2,slew_rate):
-    dtheta = np.abs(theta2-theta1)
-    dtime = np.abs(time2-time1)
-    rate_cond = np.divide(dtheta,dtime,out=np.zeros_like(dtime),where=dtime!=0)<slew_rate
-    sat_cond = sat1!=sat2
-    return sat_cond|rate_cond
+def check_manueverability(previous_times,
+                          previous_crossrange,
+                          previous_alongrange,
+                          new_time,
+                          new_crossrange,
+                          new_along_range,
+                          slew_rate,
+                          cone_angle):
+    if len(previous_times)>0:
+        d_crossrange_1 = np.abs(previous_crossrange)-cone_angle
+        d_crossrange_1[d_crossrange_1<0] = 0
+        d_crossrange_1 *= np.sign(previous_crossrange)
 
-def get_earliest_available_access(Planning_Data,data,slew_rate):
-    if len(data)>0:
-        times = []
-        sats = []
-        angles = []
-        for tar_num in Planning_Data.keys():
-            for bin_num in Planning_Data[tar_num].keys():
-                times.append(Planning_Data[tar_num][bin_num][0])
-                sats.append(Planning_Data[tar_num][bin_num][1])
-                angles.append(Planning_Data[tar_num][bin_num][2])
-        if len(times) > 0:
-            feasibility = check_manueverability(np.array(times)[:,np.newaxis],np.array(sats)[:,np.newaxis],np.array(angles)[:,np.newaxis],data[:,0],data[:,1],data[:,2],slew_rate)
-            indexes = np.where(np.all(feasibility,axis=0))[0]
-            if len(indexes) > 0:
-                return data[indexes[0]]
-        else:
-            return data[0]
+        d_alongrange_1 = np.abs(previous_alongrange)-cone_angle
+        d_alongrange_1[d_alongrange_1<0] = 0
+        d_alongrange_1 *= np.sign(previous_alongrange)
+
+        d_crossrange_2 = abs(new_crossrange)-cone_angle
+        if d_crossrange_2 < 0:
+            d_crossrange_2 = 0
+        d_crossrange_2 *= np.sign(new_crossrange)
+
+        d_alongrange_2 = abs(new_along_range)-cone_angle
+        if d_alongrange_2 < 0:
+            d_alongrange_2 = 0
+        d_alongrange_2 *= np.sign(new_along_range)
+
+        d_time = np.abs(new_time-previous_times)
+
+        slew_cond = np.abs(np.linalg.norm([np.divide(d_crossrange_1+d_crossrange_2,d_time,out=slew_rate*np.ones_like(d_time),where=d_time!=0),
+                                           np.divide(d_alongrange_1+d_alongrange_2,d_time,out=slew_rate*np.ones_like(d_time),where=d_time!=0)],axis=0))<slew_rate
+        # slew_cond = (np.abs(np.divide(d_crossrange_1+d_crossrange_2,d_time,out=slew_rate*np.ones_like(d_time),where=d_time!=0))+np.abs(np.divide(d_alongrange_1+d_alongrange_2,d_time,out=slew_rate*np.ones_like(d_time),where=d_time!=0)))<slew_rate
+        
+        return slew_cond
+    else:
+        return [[True]]
+
+def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rate,cone_angle):
+    if len(bin_access_points)>0:
+        for idx in range(len(bin_access_points)):
+            previous_sat_accesses = satellite_specific_plan[int(bin_access_points[idx,1])]
+            feasible = check_manueverability(np.array(previous_sat_accesses["Time"]),
+                                             np.array(previous_sat_accesses["Cross Range"]),
+                                             np.array(previous_sat_accesses["Along Range"]),
+                                             bin_access_points[idx,0],
+                                             bin_access_points[idx,2],
+                                             bin_access_points[idx,3],
+                                             slew_rate,
+                                             cone_angle)
+            if np.all(feasible):
+                return bin_access_points[idx]
     return False
