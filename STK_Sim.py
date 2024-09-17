@@ -37,6 +37,7 @@ class STK_Simulation:
     def Target_Loader(self,Filename):
         self.targets = []
         self.target_bins = []
+        self.target_times = []
         for target in self.root.CurrentScenario.Children.GetElements(AgESTKObjectType.eTarget):
             target.Unload()
 
@@ -51,6 +52,7 @@ class STK_Simulation:
             # Set altitude to a distance above the ground
             self.targets[-1].HeightAboveGround = 0   # km
             self.target_bins.append(np.zeros([36,9]))
+            self.target_times.append(self.root.CurrentScenario.StopTime)
             
     def Satellite_Loader(self,Filename,External_Pointing_File=False):
         self.satellites = []
@@ -96,7 +98,9 @@ class STK_Simulation:
             self.target_bins[idx] = np.zeros([36,9])
             self.target_times[idx] = self.root.CurrentScenario.StopTime
 
-    def Update_Target_Bins(self,bin,target_number):
+    def Update_Target_Bins(self,time,bin,target_number):
+        if self.target_bins[target_number][bin//9,bin%9] == 0:
+            self.target_times[target_number] = time
         self.target_bins[target_number][bin//9,bin%9]+=1
         return 0
 
@@ -118,7 +122,7 @@ class STK_Simulation:
                             time,az,el = Interpolate(time,az,el)
                         bins = np.array([(a//10)*9+(e//10) for a,e in zip(az,el)]).astype(int)
                         for j in range(len(time)):
-                            self.Update_Target_Bins(bins[j],tar_num)
+                            self.Update_Target_Bins(time[j],bins[j],tar_num)
                     bar()
         return 0
     
@@ -211,7 +215,7 @@ class STK_Simulation:
             az = self.Holding_Data['Azimuth'][idx]
             el = self.Holding_Data['Elevation'][idx]
             bin = int(az//10*9+el//10)
-            self.Update_Target_Bins(bin,self.Holding_Data['Target'][idx])
+            self.Update_Target_Bins(self.Holding_Data['Time'][idx],bin,self.Holding_Data['Target'][idx])
             bins.append(bin)
 
         self.Holding_Data["Bin Number"] = bins
