@@ -11,7 +11,7 @@ n_sats = int(input('n_sats = '))
 comp_dt = float(input('Compuation dt [secs] = '))
 comp_duration = int(input('Computation duration [days] = '))
 
-n_targets= int(input('Number of Targets? (15, 34, 62, 82, 109, 186, 494, 1131) '))
+n_targets= int(input('Number of Targets? (15, 34, 65, 82, 109, 186, 494, 1131) = '))
 opt_bool = bool(input('New Optimization? (True/False) ') == 'True')
 
 if opt_bool:
@@ -75,4 +75,4 @@ print(data_comparison)
 print(data_comparison.describe())
 
 
-dfs_to_excel(r"H:/Shared drives/AERO 401 Project  L3Harris Team 1/Subteam Designs/OCD/Superstars.xlsx", str(n_sats), df1=pd.read_csv("../../Input_Files/Satellites_File.txt"), df2=data_comparison)
+dfs_to_excel(r"H:/Shared drives/AERO 401 Project  L3Harris Team 1/Subteam Designs/OCD/Superstars.xlsx", f'{n_sats} - {n_targets}', df1=pd.read_csv("../../Input_Files/Satellites_File.txt"), df2=data_comparison)
