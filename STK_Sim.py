@@ -199,7 +199,7 @@ class STK_Simulation:
         self.Holding_Data['Cross Track'] = []
         self.Holding_Data['Along Track'] = []
 
-        with alive_bar(len(self.targets)*len(self.satellites),force_tty=True,bar='classic',title=f'- Generating_Holding Data',length=10) as bar:
+        with alive_bar(len(self.targets),force_tty=True,bar='classic',title=f'- Compiling_Data',length=10) as bar:
             for tar_num,tar in enumerate(self.targets):
                 data_holder = AER_Data[tar_num].copy()
                 for sat_num,df in enumerate(data_holder):
@@ -210,7 +210,7 @@ class STK_Simulation:
                     df['Along Track'] = Sat_Angles_Data[sat_num][tar_num]['Along Track']
                     for key in self.Holding_Data:
                         self.Holding_Data[key].extend(df[key])
-                    bar()
+                bar()
 
         bins = []
             
@@ -228,7 +228,7 @@ class STK_Simulation:
         self.Holding_Data = pd.DataFrame(self.Holding_Data).sort_values(by="Time")
 
         self.hash_map = {}
-        with alive_bar(324*len(self.targets),force_tty=True,bar='classic',title=f'- Generating_Hash',length=10) as bar:
+        with alive_bar(324*len(self.targets),force_tty=True,bar='classic',title=f'- Creating_Hash_Map',length=10) as bar:
             for tar_num in range(len(self.targets)):
                 self.hash_map[tar_num] = {}
                 tar_window = self.Holding_Data['Target'].values==tar_num
@@ -244,7 +244,7 @@ class STK_Simulation:
     def Plan(self,slew_rate,cone_angle):
         satellite_specific_plan = {key:{"Time":[],"Target":[],"Bin Number":[],"Cross Range":[],"Along Range":[]} for key in range(len(self.satellites))}
         bins = np.reshape([[[count,tar_num,bin_num] for bin_num,count in enumerate(tar_bin.ravel())] for tar_num,tar_bin in enumerate(self.target_bins)],[len(self.targets)*324,3]).astype(int)
-        with alive_bar(324*len(self.targets),force_tty=True,bar='classic',title=f'- Planning_Data',length=10) as bar:
+        with alive_bar(324*len(self.targets),force_tty=True,bar='classic',title=f'- Planning',length=10) as bar:
             for count,tar_num,bin_num in bins[bins[:,0].argsort()]:
                 if count > 0:
                     result = get_best_available_access(satellite_specific_plan,self.hash_map[tar_num][bin_num],slew_rate,cone_angle)
