@@ -11,6 +11,10 @@ n_sats = int(input('n_sats = '))
 comp_dt = float(input('Compuation dt [secs] = '))
 comp_duration = int(input('Computation duration [days] = '))
 
+conditions = [['comp_dt', comp_dt],
+              ['comp_duration', comp_duration]]
+
+
 n_targets= int(input('Number of Targets? (15, 34, 65, 82, 109, 186, 494, 1131) = '))
 opt_bool = bool(input('New Optimization? (True/False) ') == 'True')
 
@@ -22,7 +26,14 @@ if opt_bool:
 
     initial_entry = bool(input('Start with initial constellation? (True/False) ') == 'True')
 
-stk_object.Target_Loader(f"../../Input_Files/Targets_{n_targets}.txt")
+    conditions.append(['opt_dt', opt_dt])
+    conditions.append(['opt_duration', opt_duration])
+    conditions.append(['n_pop', n_pop])
+    conditions.append(['n_gen', n_gen])
+    conditions.append(['Start with Initial Constellation?', initial_entry])
+
+conditions = pd.DataFrame(conditions)
+stk_object.Target_Loader(f"../../Input_Files/Targets_{n_targets}.txt") 
 
 if opt_bool:
 
@@ -45,14 +56,15 @@ if opt_bool:
     for entry in hof:
         print(entry,"->",entry.fitness)
 
-    # Get best individual from optimization and load them into ../../Input_Files/Satellite_File.txt
+    # Get best individual from
+    #  optimization and load them into ../../Input_Files/Satellite_File.txt
 
     best_stats = opt.cost_function(hof[0])
 
 else:
     stk_object.Satellite_Loader("../../Input_Files/Satellites_File.txt")
 
-
+print('')
 stk_object.dt = comp_dt
 duration = datetime.timedelta(days=comp_duration, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0, weeks=0)
 stk_object.root.UnitPreferences.SetCurrentUnit("DateFormat", "UTCG")
@@ -74,5 +86,4 @@ data_comparison = pd.DataFrame(data_comparison)
 print(data_comparison)
 print(data_comparison.describe())
 
-
-dfs_to_excel(r"H:/Shared drives/AERO 401 Project  L3Harris Team 1/Subteam Designs/OCD/Superstars.xlsx", f'{n_sats} - {n_targets}', df1=pd.read_csv("../../Input_Files/Satellites_File.txt"), df2=data_comparison)
+dfs_to_excel(r"H:/Shared drives/AERO 401 Project  L3Harris Team 1/Subteam Designs/OCD/Superstars.xlsx", f'{n_sats} - {n_targets}', df1=pd.read_csv("../../Input_Files/Satellites_File.txt"), df2=data_comparison, df3=conditions)
