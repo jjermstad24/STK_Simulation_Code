@@ -14,9 +14,10 @@ comp_duration = int(input('Computation duration [days] = '))
 conditions = [['comp_dt', comp_dt],
               ['comp_duration', comp_duration]]
 
-
 n_targets= int(input('Number of Targets? (15, 34, 65, 82, 109, 186, 494, 1131) = '))
-opt_bool = bool(input('New Optimization? (True/False) ') == 'True')
+
+if len(pd.read_csv(r"C:\Users\rober\OneDrive\Documents\GitHub\STK_Simulation_Code\Input_Files\Satellites_File.txt",delimiter=',')) == n_sats:
+    opt_bool = bool(input('New Optimization? (True/False) ') == 'True')
 
 if opt_bool:
     n_pop = int(input('n_pop = '))

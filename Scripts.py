@@ -296,3 +296,37 @@ def dfs_to_excel(excel_file, sheet_name, df1 = pd.read_csv("../../Input_Files/Sa
             sheet.cell(row=i+15, column=j+1).value = row[key]
 
     workbook.save(excel_file)
+
+def Generate_Performance_Curve(file=r"H:/Shared drives/AERO 401 Project  L3Harris Team 1/Subteam Designs/OCD/Superstars.xlsx"):
+    df = pd.read_excel(file)
+    df.columns = df.columns.str.strip()
+    df = df.drop('Average Time to 100%', axis=1)
+    df.replace({'#REF!': None}, inplace=True)
+    df.columns = df.iloc[0]  # Assign the first row to the column headers
+    df = df[1:].reset_index(drop=True) 
+    df = df.rename(columns={df.columns[0]: 'Number of Targets'})
+
+    fig = go.Figure()
+
+    # Loop through each satellite column and add traces
+    for column in df.columns[1:]:
+        fig.add_trace(go.Scatter(
+            x=df['Number of Targets'],
+            y=df[column],
+            mode='lines+markers',
+            name=column
+        ))
+
+    # Update layout
+    fig.update_layout(
+        title='Constellation Performance Comparison',
+        xaxis_title='Number of Targets',
+        yaxis_title='Average Days to 100%',
+        legend_title='Number of Satellites',
+        template='plotly',
+        height=600,
+        width=1000
+    )
+
+    # Show the plot
+    fig.show()
