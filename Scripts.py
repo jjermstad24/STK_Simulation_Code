@@ -245,19 +245,23 @@ def check_manueverability(previous_times,
                           new_along_range,
                           slew_rate,
                           cone_angle):
+
+    d_theta_2 = (new_crossrange**2+new_along_range**2)**0.5-cone_angle
+    if d_theta_2 < 0:
+        d_theta_2 = 0
+
     if len(previous_times)>0:
         d_theta_1 = (previous_crossrange**2+previous_alongrange**2)**0.5-cone_angle
         d_theta_1[d_theta_1<0] = 0
 
-        d_theta_2 = (new_crossrange**2+new_along_range**2)**0.5-cone_angle
-        if d_theta_2 < 0:
-            d_theta_2 = 0
-
+        
         d_time = np.abs(new_time-previous_times)
-                                                   
-        return np.divide(d_theta_1+d_theta_2,d_time,out=slew_rate*np.ones_like(d_time),where=d_time!=0)<=slew_rate
-    else:
+
+        return np.divide(d_theta_1+d_theta_2,d_time,out=1.1*slew_rate*np.ones_like(d_time),where=d_time!=0)<=slew_rate
+    elif d_theta_2 == 0:
         return [[True]]
+    else:
+        return False
 
 def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rate,cone_angle):
     if len(bin_access_points)>0:
