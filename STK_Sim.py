@@ -213,13 +213,7 @@ class STK_Simulation:
                 bar()
 
         bins = []
-<<<<<<< Updated upstream
-            
         with alive_bar(len(self.Holding_Data['Time']),force_tty=True,bar='classic',title=f'- Updating_Bins',length=10) as bar:
-
-=======
-        with alive_bar(len(self.Holding_Data['Time']),force_tty=True,bar='classic',title=f'- Sorting_Bin_Data',length=10) as bar:
->>>>>>> Stashed changes
             for idx in range(len(self.Holding_Data['Time'])):
                 az = self.Holding_Data['Azimuth'][idx]
                 el = self.Holding_Data['Elevation'][idx]

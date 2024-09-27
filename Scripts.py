@@ -26,22 +26,6 @@ def Random_Decimal(t):
     lower,upper = t
     return float(decimal.Decimal(random.randrange(lower*10000,upper*10000))/10000)
 
-def Print_Spacing(len=100):
-    for i in range(len):
-        print("-",end="")
-    print()
-
-def Sun_Synchronous_Orbit(revolutions):
-    mu = 398600.44
-    J2 = 1.08262668*10**-3
-    Re = 6378
-    RAAN_Rate_SS = 1.99096871*10**-7
-    Tsid = 86164
-    period = np.pi*2*Tsid/revolutions/(2*np.pi-RAAN_Rate_SS*Tsid)
-    altitude = (mu*(period/2/np.pi)**2)**(1/3)-Re
-    inclination = np.degrees(np.arccos(-2*RAAN_Rate_SS*((Re+altitude)**7/mu)**0.5/(3*J2*Re**2)))
-    return altitude,inclination
-
 def time_convert(date):
     fmt = "%d %b %Y %H:%M:%S.%f"
     try:
@@ -59,7 +43,7 @@ def Create_Poly(filename):
 
 def get_ind():
     df = pd.read_csv("../../Input_Files/Satellites_File.txt")
-    return [df["Per"].values[0],df["Inc"].values[0],df["AoP"].values[0],len(df),len(np.unique(df["Asc"]))]
+    return [df["Per"].values[0],df["Inc"].values[0],df["AoP"].values[0],max(df["Asc"]),len(np.unique(df["Asc"]))]
 
 def polygon_random_points (poly, num_points,targets_filename):
     points = pointpats.random.poisson(poly, size=num_points)
@@ -103,21 +87,23 @@ class Optimizer:
         self.n_sats = n_sats
         creator.create("FitnessMax", base.Fitness, weights=weights)
         creator.create("Satellite", list, fitness=creator.FitnessMax)
-        self.lower = [575,0,0,1]
-        self.upper = [630,180,180,self.n_sats]
+        self.lower = [575,0,0,0,1]
+        self.upper = [630,180,180,180,self.n_sats]
 
         # Registering variables to the satellite
         self.toolbox = base.Toolbox()
         self.toolbox.register("attr_alt", random.randint, self.lower[0], self.upper[0])
         self.toolbox.register("attr_inc", random.randint, self.lower[1], self.upper[1])
         self.toolbox.register("attr_aop", random.randint, self.lower[2], self.upper[2])
-        self.toolbox.register("attr_num_planes", random.randint, self.lower[3], self.upper[3])
+        self.toolbox.register("attr_max_raan", random.randint, self.lower[3], self.upper[3])
+        self.toolbox.register("attr_num_planes", random.randint, self.lower[4], self.upper[4])
 
         # Registering satellite to the model
         self.toolbox.register("satellite", tools.initCycle, creator.Satellite,
                         (self.toolbox.attr_alt,
                         self.toolbox.attr_inc,
                         self.toolbox.attr_aop,
+                        self.toolbox.attr_max_raan,
                         self.toolbox.attr_num_planes), n=1)
 
         # Registering tools for the algorithm
@@ -140,7 +126,7 @@ class Optimizer:
         pop = self.toolbox.population(n=self.n_pop)
         i = np.random.randint(0,self.n_pop)
         if read:
-            for idx in range(4):
+            for idx in range(5):
                 pop[i][idx] = get_ind()[idx]
 
         fitnesses = list(map(self.toolbox.evaluate, pop))
@@ -201,11 +187,12 @@ class Optimizer:
             print(pd.DataFrame(record))
         return hof,percent,std,time
     
-    def cost_function(self,Individual=[0,0,0,0,0],write=True,enable_print=False):
+    def cost_function(self,Individual=[0,0,0,0,0,0],write=True,enable_print=False):
         Alt = Individual[0]
         Inc = Individual[1]
         Aop = Individual[2]
-        num_planes = int(Individual[3])
+        max_raan = Individual[3]
+        num_planes = int(Individual[4])
         num_sats = self.n_sats
         if write:
             file = open("../../Input_Files/Satellites_File.txt","w")
@@ -218,7 +205,7 @@ class Optimizer:
                 for sat in plane:
                     file.write(f"{Alt},{Alt},{Inc},{Aop},{round(Asc,4)},{round(Loc,4)},{1}\n")
                     if len(plane)>1: Loc += 360/(len(plane)-1)
-                if len(planes)>1:Asc += 180/(len(planes)-1)
+                if len(planes)>1:Asc += max_raan/(len(planes)-1)
             file.close()
         satellites_filename = '../../Input_Files/Satellites_File.txt'
         self.stk_object.Satellite_Loader(satellites_filename)
