@@ -235,7 +235,7 @@ class Optimizer:
         self.stk_object.Compute_AzEl(enable_print)
         percentages = np.array([100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))])
         times = np.array([self.stk_object.target_times[idx]/3600 for idx in range(len(self.stk_object.targets))])
-        return np.average(percentages),np.std(percentages),max(times)
+        return np.average(percentages),np.std(percentages),np.std(times)
         
 def Interpolate(time,az,el):
     times = np.arange(time[0],time[-1],2.5)
