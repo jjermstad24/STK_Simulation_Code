@@ -1,0 +1,11 @@
+Initial Conditions:
+
+n_sats_min: 3
+n_sats_max: 3
+n_pop: 3
+n_gen: 3
+opt_dt: 2.5
+opt_duration: 125
+comp_dt: 3.0
+comp_duration: 3
+n_targets: 34

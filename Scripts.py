@@ -9,7 +9,19 @@ import plotly.graph_objects as go
 import plotly.express as px
 import os, sys
 import plotly.offline
-
+from dataclasses import dataclass, field
+from typing import Dict, List
+from alive_progress import alive_bar
+from deap import base
+from deap import creator
+from deap import tools
+from IPython.display import clear_output
+import scipy.interpolate as interpolate
+import time
+import pointpats
+import re
+import openpyxl
+import shutil
 
 def Random_Decimal(t):
     lower,upper = t
@@ -46,17 +58,13 @@ def Create_Poly(filename):
         l.append((df['Lat'][i],df['Lon'][i]))
     return Polygon(l)
 
-def polygon_random_points (poly, num_points):
-    min_x, min_y, max_x, max_y = poly.bounds
-    df = {'Lat':[],'Lon':[]}
-    count = 0
-    while count != num_points:
-        random_point = Point([random.uniform(min_x, max_x), random.uniform(min_y, max_y)])
-        if (random_point.within(poly)):
-            df['Lat'].append(random_point.y)
-            df['Lon'].append(random_point.x)
-            count += 1
-    return pd.DataFrame(df)
+def get_ind():
+    df = pd.read_csv("../../Input_Files/Satellites_File.txt")
+    return [df["Per"].values[0],df["Inc"].values[0],df["AoP"].values[0],len(df),len(np.unique(df["Asc"]))]
+
+def polygon_random_points (poly, num_points,targets_filename):
+    points = pointpats.random.poisson(poly, size=num_points)
+    return pd.DataFrame({'Lat':points[:,1],'Lon':points[:,0]}).dropna().to_csv(targets_filename,index=False)
 
 def plot_targets_and_polygon(poly,filename):
     df = pd.read_csv(filename)
@@ -88,3 +96,271 @@ def Pointing_File_Generator(filename,period):
         f.write(f'{period/162*(i+1)} {(i%9+1)*10-5} {(i//9+1)*10-5}\n')
     f.write('End Attitude')
     f.close()
+
+class Optimizer:
+    def __init__(self,stk_object,n_pop,n_gen,n_sats,weights = (7.0,-7.0), delta_raan=90):
+        self.stk_object = stk_object
+        self.n_pop = n_pop
+        self.n_gen = n_gen
+        self.n_sats = n_sats
+        creator.create("FitnessMax", base.Fitness, weights=weights)
+        creator.create("Satellite", list, fitness=creator.FitnessMax)
+        self.lower = [580,0,0,0,0,1]
+        self.upper = [630,180,180,180,delta_raan,self.n_sats]
+
+        # Registering variables to the satellite
+        self.toolbox = base.Toolbox()
+        self.toolbox.register("attr_alt", random.randint, self.lower[0], self.upper[0])
+        self.toolbox.register("attr_inc", random.randint, self.lower[1], self.upper[1])
+        self.toolbox.register("attr_aop", random.randint, self.lower[2], self.upper[2])
+        self.toolbox.register("attr_initial_raan", random.randint, self.lower[3], self.upper[3])
+        self.toolbox.register("attr_delta_raan", random.randint, self.lower[4], self.upper[4])
+        self.toolbox.register("attr_num_planes", random.randint, self.lower[5], self.upper[5])
+
+        # Registering satellite to the model
+        self.toolbox.register("satellite", tools.initCycle, creator.Satellite,
+                        (self.toolbox.attr_alt,
+                        self.toolbox.attr_inc,
+                        self.toolbox.attr_aop,
+                        self.toolbox.attr_initial_raan,
+                        self.toolbox.attr_delta_raan,
+                        self.toolbox.attr_num_planes), n=1)
+
+        # Registering tools for the algorithm
+        self.toolbox.register("population", tools.initRepeat, list, self.toolbox.satellite)
+        self.toolbox.register("evaluate", self.cost_function)
+        self.toolbox.register("mate", tools.cxUniform,indpb=0.5)
+        self.toolbox.register("mutate", tools.mutUniformInt, low=self.lower,up=self.upper, indpb=0.5)
+        self.toolbox.register("select", tools.selTournament, tournsize=int(self.n_pop//2))
+        self.stats = tools.Statistics(key=lambda ind: ind.fitness.values)
+        self.stats.register("avg", np.mean, axis=0)
+        self.stats.register("std", np.std, axis=0)
+        self.stats.register("min", np.min, axis=0)
+        self.stats.register("max", np.max, axis=0)
+
+    def run(self,read=False):
+        self.fits = []
+        CXPB = 0.7;MUTPB=0.3
+        g = 0
+        # Creating a population to evolve
+        pop = self.toolbox.population(n=self.n_pop)
+        i = np.random.randint(0,self.n_pop)
+        if read:
+            for idx in range(5):
+                pop[i][idx] = get_ind()[idx]
+
+        fitnesses = list(map(self.toolbox.evaluate, pop))
+        for ind, fit in zip(pop, fitnesses):
+            ind.fitness.values = fit
+        hof = tools.HallOfFame(5)
+        hof.update(pop)
+
+        print(pop[i])
+        print(pop[i].fitness)
+
+        percent = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
+        std =  {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
+        # time = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
+
+        self.fits.append([ind.fitness.values for ind in pop])
+        record = self.stats.compile(pop)
+
+        clear_output(wait=False)
+        print("-- Generation %i --" % g)
+        print(pd.DataFrame(record))
+
+        # Begin the evolution
+        while g < self.n_gen:
+            # clear_output(wait=True)
+            g = g + 1
+
+            # A new generation
+            # Select the next generation individuals
+            offspring = self.toolbox.select(pop, len(pop))
+            # Clone the selected individuals
+            offspring = list(map(self.toolbox.clone, offspring))
+            # Apply crossover and mutation on the offspring
+            for child1, child2 in zip(offspring[::2], offspring[1::2]):
+                if random.random() < CXPB:
+                    self.toolbox.mate(child1, child2)
+                    del child1.fitness.values
+                    del child2.fitness.values
+
+            for mutant in offspring:
+                if random.random() < MUTPB:
+                    self.toolbox.mutate(mutant)
+                    del mutant.fitness.values
+            # Evaluate the individuals with an invalid fitness
+            invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
+            fitnesses = map(self.toolbox.evaluate, invalid_ind)
+
+            for ind, fit in zip(invalid_ind, fitnesses):
+                ind.fitness.values = fit
+            pop[:] = offspring
+            hof.update(pop)
+
+            self.fits.append([ind.fitness.values for ind in pop])
+            record = self.stats.compile(pop)
+
+            clear_output(wait=False)
+            print("-- Generation %i --" % g)
+            print(pd.DataFrame(record))
+        return hof,percent,std # ,time
+    
+    def cost_function(self,Individual=[0,0,0,0,0,0,0],write=True,enable_print=False):
+        Alt = Individual[0]
+        Inc = Individual[1]
+        Aop = Individual[2]
+        initial_raan = Individual[3]
+        num_planes = int(Individual[5])
+        delta_raan = Individual[4]
+        num_sats = self.n_sats
+        if write:
+            file = open("../../Input_Files/Satellites_File.txt","w")
+            file.write("Per,Apo,Inc,AoP,Asc,Loc,Tar\n")
+            sats = num_sats*[1]
+            planes = np.array_split(sats,num_planes)
+            Asc = initial_raan
+            i=1
+            for plane in planes:
+                Loc = 0
+                for sat in plane:
+                    file.write(f"{Alt},{Alt},{Inc},{Aop},{round(Asc%360,4)},{round(Loc,4)},{1}\n")
+                    if len(plane)>1: Loc += 360/(len(plane)-1)
+                if len(planes)>1:Asc -= i*((-1)**(i))*delta_raan
+                i+=1
+            file.close()
+        satellites_filename = '../../Input_Files/Satellites_File.txt'
+        self.stk_object.Satellite_Loader(satellites_filename)
+        self.stk_object.Compute_AzEl(enable_print)
+        percentages = np.array([100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))])
+        times = np.array([self.stk_object.target_times[idx]/3600 for idx in range(len(self.stk_object.targets))])
+        return np.average(percentages),np.std(percentages) # ,max(times)
+        
+def Interpolate(time,az,el):
+    times = np.arange(time[0],time[-1],2.5)
+    if max(el)>=60 and len(time)>3:
+        az_t = interpolate.interpn(points=[time],values=np.array([np.unwrap(az,period=360)]).T,xi=times,method='pchip')[:,0]%360
+        el_t = interpolate.interp1d(x=time,y=[el],kind='cubic')(times)[0]
+    else:
+        ans = interpolate.interp1d(x=time,y=[np.unwrap(az,period=360),el],kind='quadratic')(times).T
+        az_t = ans[:,0]%360;el_t = ans[:,1]
+    return times,az_t,el_t
+
+def check_manueverability(previous_times,
+                          previous_crossrange,
+                          previous_alongrange,
+                          new_time,
+                          new_crossrange,
+                          new_along_range,
+                          slew_rate,
+                          cone_angle):
+    if len(previous_times)>0:
+        d_theta_1 = (previous_crossrange**2+previous_alongrange**2)**0.5-cone_angle
+        d_theta_1[d_theta_1<0] = 0
+
+        d_theta_2 = (new_crossrange**2+new_along_range**2)**0.5-cone_angle
+        if d_theta_2 < 0:
+            d_theta_2 = 0
+
+        d_time = np.abs(new_time-previous_times)
+                                                   
+        return np.divide(d_theta_1+d_theta_2,d_time,out=slew_rate*np.ones_like(d_time),where=d_time!=0)<=slew_rate
+    else:
+        return [[True]]
+
+def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rate,cone_angle):
+    if len(bin_access_points)>0:
+        for idx in range(len(bin_access_points)):
+            previous_sat_accesses = satellite_specific_plan[int(bin_access_points[idx,1])]
+            feasible = check_manueverability(np.array(previous_sat_accesses["Time"]),
+                                             np.array(previous_sat_accesses["Cross Range"]),
+                                             np.array(previous_sat_accesses["Along Range"]),
+                                             bin_access_points[idx,0],
+                                             bin_access_points[idx,2],
+                                             bin_access_points[idx,3],
+                                             slew_rate,
+                                             cone_angle)
+            if np.all(feasible):
+                return bin_access_points[idx]
+    return False
+
+def dfs_to_excel(excel_file, sheet_name, df1=False, df2=False, df3=False):
+    workbook = openpyxl.load_workbook(excel_file)
+    if sheet_name in workbook.sheetnames:
+        sheet = workbook[sheet_name]
+    else:
+        sheet = workbook.create_sheet(sheet_name)
+
+    if df1 is not False:
+        for i, row in df1.iterrows():
+            for j, key in enumerate(df1.columns):
+                sheet.cell(row=1, column=j+1).value = key
+                sheet.cell(row=i+2, column=j+1).value = row[key]
+    if df2 is not False:
+        for i, row in df2.iterrows():
+            for j, key in enumerate(df2.columns):
+                sheet.cell(row=1, column=j+len(df1.columns)+2).value = key
+                sheet.cell(row=i+2, column=j+len(df1.columns)+2).value = row[key]
+    if df3 is not False:
+        for i, row in df3.iterrows():
+            for j, key in enumerate(df3.columns):
+                sheet.cell(row=i+15, column=j+1).value = row[key]
+
+    workbook.save(excel_file)
+
+def Generate_Performance_Curve(file=r"H:/Shared drives/AERO 401 Project  L3Harris Team 1/Subteam Designs/OCD/Superstars.xlsx"):
+    df = pd.read_excel(file)
+    df.columns = df.columns.str.strip()
+    df = df.drop('Average Time to 100%', axis=1)
+    df.replace({'#REF!': None}, inplace=True)
+    df.columns = df.iloc[0]  # Assign the first row to the column headers
+    df = df[1:].reset_index(drop=True) 
+    df = df.rename(columns={df.columns[0]: 'Number of Targets'})
+
+    fig = go.Figure()
+
+    # Loop through each satellite column and add traces
+    for column in df.columns[1:]:
+        if column != 'Ref':
+            fig.add_trace(go.Scatter(
+                x=df['Number of Targets'],
+                y=df[column],
+                mode='lines+markers',
+                name=column
+            ))
+        else:
+            fig.add_trace(go.Scatter(
+                x=np.linspace(0, 120, 100),
+                y=[30 for x1 in np.linspace(0, 120, 100)],
+                mode = 'lines',
+                line=dict(dash='dash',
+                          color='red',
+                          width=3),
+                name='Constraint'
+            ))
+
+    # Update layout
+    fig.update_layout(
+        title='Constellation Performance Comparison',
+        xaxis_title='Number of Targets',
+        yaxis_title='Average Days to 100%',
+        legend_title='Number of Satellites',
+        template='plotly',
+        font=dict(size=16)
+    )
+
+    fig.add_annotation(
+    xref="paper",  # xref and yref refer to the entire plot's coordinate system
+    yref="paper",
+    x=0.5,  # 0.5 refers to the center of the plot horizontally (normalized from 0 to 1)
+    y=.95,  # Slightly above the line
+    text="30 Day Duration Constraint",  # Text annotation
+    showarrow=False,  # No arrow, just the text
+    font=dict(size=18,
+              color='red'),  # Font size
+)
+
+
+    # Show the plot
+    fig.show()
