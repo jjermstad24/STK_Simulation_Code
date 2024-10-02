@@ -105,24 +105,28 @@ class STK_Simulation:
         return 0
 
     def Compute_AzEl(self,enable_print=True):
+        az_range = list(range(0,360,10))
+        el_range = list(range(0,90,10))
+
         self.Reset_Target_Bins()
         with alive_bar(len(self.targets)*len(self.satellites),force_tty=True,bar='classic',title='- Computing_AzEl',length=10,disable=not(enable_print)) as bar:
             for sat in self.satellites:
                 for tar_num,tar in enumerate(self.targets):
                     access = tar.GetAccessToObject(sat)
                     access.ComputeAccess()
-                    DataSets = access.DataProviders.GetItemByName('AER Data').Group.Item(0).ExecElements(self.root.CurrentScenario.StartTime,
-                                                                                                        self.root.CurrentScenario.StopTime,
-                                                                                                        self.dt,['Time','Azimuth','Elevation']).DataSets
-                    for idx in range(0,DataSets.Count,3):
-                        time = DataSets.Item(idx).GetValues()
-                        az = DataSets.Item(idx+1).GetValues()
-                        el = np.abs(DataSets.Item(idx+2).GetValues())
-                        if self.Interpolate:
-                            time,az,el = Interpolate(time,az,el)
-                        bins = np.array([(a//10)*9+(e//10) for a,e in zip(az,el)]).astype(int)
-                        for j in range(len(time)):
-                            self.Update_Target_Bins(time[j],bins[j],tar_num)
+                    Intervals = access.DataProviders.GetItemByName('AER Data').Group.Item(0).ExecElements(self.root.CurrentScenario.StartTime,
+                                                                                                self.root.CurrentScenario.StopTime,
+                                                                                                self.dt,['Time','Azimuth','Elevation']).Intervals
+                    for Int in Intervals:
+                        times_az = Int.MultipleThresholdCrossings("Azimuth",az_range)
+                        times_el = Int.MultipleThresholdCrossings("Elevation",el_range)
+                        for i,t_az in enumerate(times_az[1:]):
+                            for j,t_el in enumerate(times_el[1:]):
+                                if len(t_az)>0 and len(t_el)>0:
+                                    for t in t_el:
+                                        if (any(t[0] <= value <= t[1] for value in t_az[0]) or 
+                                            any(t_az[0][0] <= value <= t_az[0][1] for value in t)):
+                                            self.Update_Target_Bins(t_az[0][0],i*9+j,tar_num)
                     bar()
         return 0
     
@@ -276,3 +280,11 @@ class STK_Simulation:
                                           "Along Track":Along_Range,
                                           "Bin Number":Bins})
         return 0
+
+    def set_sim_time(self,days=1, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0, weeks=0):
+        self.root.UnitPreferences.SetCurrentUnit("DateFormat", "UTCG")
+        start_time = time_convert(self.root.CurrentScenario.StartTime)
+        duration = datetime.timedelta(days=days, seconds=seconds, microseconds=microseconds, milliseconds=milliseconds, minutes=minutes, hours=hours, weeks=weeks)
+        stop_time=(start_time+duration).strftime("%d %b %Y %H:%M:%S.%f")
+        self.root.CurrentScenario.StopTime=stop_time
+        self.root.UnitPreferences.SetCurrentUnit("DateFormat", "EpSec")

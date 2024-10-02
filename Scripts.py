@@ -3,7 +3,6 @@ import decimal
 import numpy as np
 import pandas as pd
 import datetime
-from faker import Faker
 from shapely.geometry import Polygon, Point
 import plotly.graph_objects as go
 import plotly.express as px
@@ -18,8 +17,6 @@ from deap import tools
 from IPython.display import clear_output
 import scipy.interpolate as interpolate
 import time
-import pointpats
-import re
 import openpyxl
 
 def Random_Decimal(t):
@@ -44,10 +41,6 @@ def Create_Poly(filename):
 def get_ind():
     df = pd.read_csv("../../Input_Files/Satellites_File.txt")
     return [df["Per"].values[0],df["Inc"].values[0],df["AoP"].values[0],max(df["Asc"]),len(np.unique(df["Asc"]))]
-
-def polygon_random_points (poly, num_points,targets_filename):
-    points = pointpats.random.poisson(poly, size=num_points)
-    return pd.DataFrame({'Lat':points[:,1],'Lon':points[:,0]}).dropna().to_csv(targets_filename,index=False)
 
 def plot_targets_and_polygon(poly,filename):
     df = pd.read_csv(filename)
@@ -320,11 +313,3 @@ def Generate_Performance_Curve(file=r"H:/Shared drives/AERO 401 Project  L3Harri
 
     # Show the plot
     fig.show()
-
-def set_sim_time(stk_object,days=1, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0, weeks=0):
-    stk_object.root.UnitPreferences.SetCurrentUnit("DateFormat", "UTCG")
-    start_time = time_convert(stk_object.root.CurrentScenario.StartTime)
-    duration = datetime.timedelta(days=days, seconds=seconds, microseconds=microseconds, milliseconds=milliseconds, minutes=minutes, hours=hours, weeks=weeks)
-    stop_time=(start_time+duration).strftime("%d %b %Y %H:%M:%S.%f")
-    stk_object.root.CurrentScenario.StopTime=stop_time
-    stk_object.root.UnitPreferences.SetCurrentUnit("DateFormat", "EpSec")
