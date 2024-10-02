@@ -85,16 +85,8 @@ def plot_targets_and_polygon(poly,filename):
             'zoom': 0})
     return fig
 
-def Pointing_File_Generator(filename,period):
-    f = open(filename,"w")
-    f.write("stk.v.12.1.1\nBegin\tAttitude\nNumberofAttitudePoints\t162\nSequence\t323\nRepeatPattern\n")
-    for i in range(162):
-        f.write(f'{period/162*(i+1)} {(i%9+1)*10-5} {(i//9+1)*10-5}\n')
-    f.write('End Attitude')
-    f.close()
-
 class Optimizer:
-    def __init__(self,stk_object,n_pop,n_gen,n_sats,weights = (7.0,-7.0,-1.0), lower_bounds=[], upper_bounds=[]):
+    def __init__(self,stk_object,n_pop,n_gen,n_sats,weights = (7.0,-7.0,-1.0,-1.0), lower_bounds=[], upper_bounds=[]):
         self.stk_object = stk_object
         self.n_pop = n_pop
         self.n_gen = n_gen
@@ -154,9 +146,10 @@ class Optimizer:
         print(pop[i])
         print(pop[i].fitness)
 
-        percent = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
-        std =  {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
-        time = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
+        avg_percent = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
+        std_percent =  {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
+        avg_time = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
+        std_time = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
 
         self.fits.append([ind.fitness.values for ind in pop])
         record = self.stats.compile(pop)
@@ -201,7 +194,7 @@ class Optimizer:
             clear_output(wait=False)
             print("-- Generation %i --" % g)
             print(pd.DataFrame(record))
-        return hof,percent,std,time
+        return hof,avg_percent,std_percent,avg_time,std_time
     
     def cost_function(self,Individual=[0,0,0,0,0,0,0],write=True,enable_print=False):
         Alt = Individual[0]
@@ -222,7 +215,7 @@ class Optimizer:
                 Loc = 0
                 for sat in plane:
                     file.write(f"{Alt},{Alt},{Inc},{Aop},{round(Asc%360,4)},{round(Loc,4)},{1}\n")
-                    if len(plane)>1: Loc += 360/(len(plane)-1)
+                    if len(plane)>1: Loc += 360/(len(plane))
                 if len(planes)>1:Asc -= i*((-1)**(i))*delta_raan
                 i+=1
             file.close()
@@ -231,7 +224,7 @@ class Optimizer:
         self.stk_object.Compute_AzEl(enable_print)
         percentages = np.array([100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))])
         times = np.array([self.stk_object.target_times[idx] for idx in range(len(self.stk_object.targets))])
-        return np.average(percentages),np.std(percentages),np.max(times)
+        return np.average(percentages),np.std(percentages),np.average(times), np.std(times)
         
 def Interpolate(time,az,el):
     times = np.arange(time[0],time[-1],2.5)
