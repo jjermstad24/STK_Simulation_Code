@@ -208,7 +208,7 @@ class Optimizer:
             print(pd.DataFrame(record))
         return hof,percent,std,time
     
-    def cost_function(self,Individual=[0,0,0,0,0,0,0],write=True,enable_print=True):
+    def cost_function(self,Individual=[0,0,0,0,0,0,0],write=True,enable_print=False):
         Alt = Individual[0]
         Inc = Individual[1]
         Aop = Individual[2]
