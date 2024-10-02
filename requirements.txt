@@ -1,0 +1,12 @@
+random2
+numpy
+pandas
+datetime
+Faker
+Shapely
+plotly
+alive-progress
+deap
+scipy
+pointpats
+openpyxl
