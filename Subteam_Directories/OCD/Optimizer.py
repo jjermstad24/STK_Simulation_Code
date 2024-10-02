@@ -37,7 +37,10 @@ for n_sats in range(n_sats_min,n_sats_max+1):
     os.system('cls')
     print(f'{n_sats} sats:\n')
 
-    opt = Optimizer(stk_object,n_pop,n_gen,n_sats,weights=(7,-5,-1))
+    lower_bounds = [580,40,0,0,0,1] # alt, inc, AOP, initial_raan, delta_raan, n_planes
+    upper_bounds = [630,150,0,180,90,n_sats]
+
+    opt = Optimizer(stk_object,n_pop,n_gen,n_sats,weights=(7,-5, -1),lower_bounds=lower_bounds, upper_bounds=upper_bounds)
     stk_object.Interpolate=True
     res = opt.run(read=False)
     
