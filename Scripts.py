@@ -1,5 +1,4 @@
 import random
-import decimal
 import numpy as np
 import pandas as pd
 import datetime
@@ -23,10 +22,6 @@ import re
 import openpyxl
 import shutil
 import json
-
-def Random_Decimal(t):
-    lower,upper = t
-    return float(decimal.Decimal(random.randrange(lower*10000,upper*10000))/10000)
 
 def Print_Spacing(len=100):
     for i in range(len):
