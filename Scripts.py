@@ -211,8 +211,8 @@ class Optimizer:
         self.stk_object.Satellite_Loader(satellites_filename)
         self.stk_object.Compute_AzEl(enable_print)
         percentages = np.array([100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))])
-        times = np.array([self.stk_object.target_times[idx]/3600 for idx in range(len(self.stk_object.targets))])
-        return np.average(percentages),np.std(percentages),max(times)
+        times = np.array([self.stk_object.target_times[idx] for idx in range(len(self.stk_object.targets))])
+        return np.average(percentages),np.std(percentages),np.max(times)
         
 def Interpolate(time,az,el):
     times = np.arange(time[0],time[-1],2.5)
@@ -241,14 +241,13 @@ def check_manueverability(previous_times,
         d_theta_1 = (previous_crossrange**2+previous_alongrange**2)**0.5-cone_angle
         d_theta_1[d_theta_1<0] = 0
 
-        
         d_time = np.abs(new_time-previous_times)
 
         return np.divide(d_theta_1+d_theta_2,d_time,out=1.1*slew_rate*np.ones_like(d_time),where=d_time!=0)<=slew_rate
-    elif d_theta_2 == 0:
+    elif (slew_rate==0 and d_theta_2==0) or (slew_rate>0):
         return [[True]]
     else:
-        return False
+        return [[False]]
 
 def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rate,cone_angle):
     if len(bin_access_points)>0:
@@ -321,3 +320,11 @@ def Generate_Performance_Curve(file=r"H:/Shared drives/AERO 401 Project  L3Harri
 
     # Show the plot
     fig.show()
+
+def set_sim_time(stk_object,days=1, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0, weeks=0):
+    stk_object.root.UnitPreferences.SetCurrentUnit("DateFormat", "UTCG")
+    start_time = time_convert(stk_object.root.CurrentScenario.StartTime)
+    duration = datetime.timedelta(days=days, seconds=seconds, microseconds=microseconds, milliseconds=milliseconds, minutes=minutes, hours=hours, weeks=weeks)
+    stop_time=(start_time+duration).strftime("%d %b %Y %H:%M:%S.%f")
+    stk_object.root.CurrentScenario.StopTime=stop_time
+    stk_object.root.UnitPreferences.SetCurrentUnit("DateFormat", "EpSec")
