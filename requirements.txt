@@ -10,3 +10,4 @@ deap
 scipy
 pointpats
 openpyxl
+C:\Program Files\AGI\STK 12\bin\AgPythonAPI\agi.stk12-12.5.0-py3-none-any.whl
