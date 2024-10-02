@@ -22,6 +22,7 @@ import pointpats
 import re
 import openpyxl
 import shutil
+import json
 
 def Random_Decimal(t):
     lower,upper = t
@@ -98,15 +99,15 @@ def Pointing_File_Generator(filename,period):
     f.close()
 
 class Optimizer:
-    def __init__(self,stk_object,n_pop,n_gen,n_sats,weights = (7.0,-7.0,-1.0), delta_raan=90):
+    def __init__(self,stk_object,n_pop,n_gen,n_sats,weights = (7.0,-7.0,-1.0), lower_bounds=[], upper_bounds=[]):
         self.stk_object = stk_object
         self.n_pop = n_pop
         self.n_gen = n_gen
         self.n_sats = n_sats
         creator.create("FitnessMax", base.Fitness, weights=weights)
         creator.create("Satellite", list, fitness=creator.FitnessMax)
-        self.lower = [580,0,0,0,0,1]
-        self.upper = [630,180,180,180,delta_raan,self.n_sats]
+        self.lower = lower_bounds
+        self.upper = upper_bounds
 
         # Registering variables to the satellite
         self.toolbox = base.Toolbox()
@@ -207,7 +208,7 @@ class Optimizer:
             print(pd.DataFrame(record))
         return hof,percent,std,time
     
-    def cost_function(self,Individual=[0,0,0,0,0,0,0],write=True,enable_print=False):
+    def cost_function(self,Individual=[0,0,0,0,0,0,0],write=True,enable_print=True):
         Alt = Individual[0]
         Inc = Individual[1]
         Aop = Individual[2]
@@ -234,8 +235,8 @@ class Optimizer:
         self.stk_object.Satellite_Loader(satellites_filename)
         self.stk_object.Compute_AzEl(enable_print)
         percentages = np.array([100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))])
-        times = np.array([self.stk_object.target_times[idx]/3600 for idx in range(len(self.stk_object.targets))])
-        return np.average(percentages),np.std(percentages),np.std(times)
+        times = np.array([self.stk_object.target_times[idx] for idx in range(len(self.stk_object.targets))])
+        return np.average(percentages),np.std(percentages),np.max(times)
         
 def Interpolate(time,az,el):
     times = np.arange(time[0],time[-1],2.5)
@@ -255,20 +256,24 @@ def check_manueverability(previous_times,
                           new_along_range,
                           slew_rate,
                           cone_angle):
+
+    d_theta_2 = (new_crossrange**2+new_along_range**2)**0.5-cone_angle
+    if d_theta_2 < 0:
+        d_theta_2 = 0
+
     if len(previous_times)>0:
         d_theta_1 = (previous_crossrange**2+previous_alongrange**2)**0.5-cone_angle
         d_theta_1[d_theta_1<0] = 0
 
-        d_theta_2 = (new_crossrange**2+new_along_range**2)**0.5-cone_angle
-        if d_theta_2 < 0:
-            d_theta_2 = 0
-
         d_time = np.abs(new_time-previous_times)
-                                                   
-        return np.divide(d_theta_1+d_theta_2,d_time,out=slew_rate*np.ones_like(d_time),where=d_time!=0)<=slew_rate
-    else:
-        return [[True]]
 
+        return np.divide(d_theta_1+d_theta_2,d_time,out=1.1*slew_rate*np.ones_like(d_time),where=d_time!=0)<=slew_rate
+    elif (slew_rate==0 and d_theta_2==0) or (slew_rate>0):
+        return [[True]]
+    else:
+        return [[False]]
+    
+    
 def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rate,cone_angle):
     if len(bin_access_points)>0:
         for idx in range(len(bin_access_points)):
@@ -360,7 +365,38 @@ def Generate_Performance_Curve(file=r"H:/Shared drives/AERO 401 Project  L3Harri
     font=dict(size=18,
               color='red'),  # Font size
 )
-
-
     # Show the plot
     fig.show()
+
+
+def save_to_json(data, filepath):
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    def default_converter(o):
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        raise TypeError(f'Object of type {o.__class__.__name__} is not JSON serializable')
+    with open(filepath, 'w') as json_file:
+        json.dump(data, json_file, indent=4, default=default_converter)
+
+def load_from_json(filepath):
+    def object_hook(dct):
+        new_dict = {}
+        for key, value in dct.items():
+            try:
+                new_key = int(key)
+            except ValueError:
+                new_key = key
+            if isinstance(value, list):
+                try:
+                    new_dict[new_key] = np.array(value)
+                except:
+                    new_dict[new_key] = value
+            elif isinstance(value, float) and value.is_integer():
+                new_dict[new_key] = int(value)
+            else:
+                new_dict[new_key] = value
+
+        return new_dict
+
+    with open(filepath, 'r') as json_file:
+        return json.load(json_file, object_hook=object_hook)

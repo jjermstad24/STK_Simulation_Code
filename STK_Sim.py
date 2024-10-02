@@ -61,7 +61,7 @@ class STK_Simulation:
             # Set altitude to a distance above the ground
             self.targets[-1].HeightAboveGround = 0   # km
             self.target_bins.append(np.zeros([36,9]))
-            self.target_times.append(self.root.CurrentScenario.StopTime)
+            self.target_times.append(np.zeros([36,9]))
             
     def Satellite_Loader(self,Filename,External_Pointing_File=False):
         self.satellites = []
@@ -105,11 +105,11 @@ class STK_Simulation:
     def Reset_Target_Bins(self):
         for idx in range(len(self.targets)):
             self.target_bins[idx] = np.zeros([36,9])
-            self.target_times[idx] = self.root.CurrentScenario.StopTime
+            self.target_times[idx] = self.root.CurrentScenario.StopTime*np.ones([36,9])
 
     def Update_Target_Bins(self,time,bin,target_number):
-        if self.target_bins[target_number][bin//9,bin%9] == 0:
-            self.target_times[target_number] = time
+        if time < self.target_times[target_number][bin//9,bin%9]:
+            self.target_times[target_number][bin//9,bin%9] = time
         self.target_bins[target_number][bin//9,bin%9]+=1
         return 0
 
@@ -291,6 +291,7 @@ class STK_Simulation:
         data_comparison = {}
         if Unplanned:
             data_comparison["Unplanned (%)"] = [len(np.unique(self.Holding_Data[self.Holding_Data['Target'].values==tar_num]['Bin Number'].values))/324*100 for tar_num in range(len(self.targets))]
+            data_comparison["Unplanned (Time)"] = [len(np.unique(self.Holding_Data[self.Holding_Data['Target'].values==tar_num]['Bin Number'].values))/324*100 for tar_num in range(len(self.targets))]  
         if Planned:
             data_comparison["Planned (%)"] = [len(np.unique(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Bin Number'].values))/324*100 for tar_num in range(len(self.targets))]
             data_comparison["Planned (Time)"] = [max(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Time'].values)/86400 for tar_num in range(len(self.targets))]
