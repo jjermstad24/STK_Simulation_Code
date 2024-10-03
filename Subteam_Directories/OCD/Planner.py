@@ -25,9 +25,5 @@ stk_object.Plan(slew_rate=1,cone_angle=20)
 
 stk_object.Create_Data_Comparison_df(Planned=True, Unplanned=True)
 print(stk_object.data_comparison)
-print(pd.DataFrame(stk_object.data_comparison.describe()))
+print(stk_object.data_comparison.describe())
 dfs_to_excel(r"H:/Shared drives/AERO 401 Project  L3Harris Team 1/Subteam Designs/OCD/Superstars.xlsx", f'{n_sats[1]} - {n_targets[1]}', df1=pd.read_csv(f"../../Input_Files/Constellations/{n_sats[1]}.txt"), df2=stk_object.data_comparison, df3=initial_conditions)
-
-print('Saving to JSON...')
-save_to_json(data=stk_object.hash_map, filepath=(f"../../Input_Files/Hash Maps/{n_sats[1]} - {n_targets[1]}.json"))
-print('PLANNING COMPLETE')

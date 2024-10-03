@@ -196,7 +196,7 @@ class Optimizer:
             print(pd.DataFrame(record))
         return hof,avg_percent,std_percent,avg_time,std_time
     
-    def cost_function(self,Individual=[0,0,0,0,0,0,0],write=True,enable_print=False):
+    def cost_function(self,Individual=[0,0,0,0,0,0,0],write=True,enable_print=True):
         Alt = Individual[0]
         Inc = Individual[1]
         Aop = Individual[2]
@@ -215,7 +215,7 @@ class Optimizer:
                 Loc = 0
                 for sat in plane:
                     file.write(f"{Alt},{Alt},{Inc},{Aop},{round(Asc%360,4)},{round(Loc,4)},{1}\n")
-                    if len(plane)>1: Loc += 360/(len(plane))
+                    if len(plane)>1: Loc += 360/len(plane)
                 if len(planes)>1:Asc -= i*((-1)**(i))*delta_raan
                 i+=1
             file.close()
