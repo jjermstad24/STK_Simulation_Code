@@ -245,13 +245,13 @@ def check_manueverability(previous_times,
 def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rate,cone_angle):
     if len(bin_access_points)>0:
         for idx in range(len(bin_access_points)):
-            previous_sat_accesses = satellite_specific_plan[int(bin_access_points[idx,1])]
+            previous_sat_accesses = satellite_specific_plan[int(bin_access_points[idx,3])]
             feasible = check_manueverability(np.array(previous_sat_accesses["Time"]),
                                              np.array(previous_sat_accesses["Cross Range"]),
                                              np.array(previous_sat_accesses["Along Range"]),
                                              bin_access_points[idx,0],
+                                             bin_access_points[idx,1],
                                              bin_access_points[idx,2],
-                                             bin_access_points[idx,3],
                                              slew_rate,
                                              cone_angle)
             if np.all(feasible):
