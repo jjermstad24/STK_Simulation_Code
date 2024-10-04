@@ -38,8 +38,8 @@ def Create_Poly(filename):
         l.append((df['Lat'][i],df['Lon'][i]))
     return Polygon(l)
 
-def get_ind():
-    df = pd.read_csv("../../Input_Files/Satellites_File.txt")
+def get_ind(n_sats):
+    df = pd.read_csv(f"../../Input_Files/Satellites_File_{n_sats}.txt")
     return [df["Per"].values[0],df["Inc"].values[0],df["AoP"].values[0],max(df["Asc"]),len(np.unique(df["Asc"]))]
 
 def plot_targets_and_polygon(poly,filename):
@@ -73,30 +73,32 @@ def Pointing_File_Generator(filename,period):
     f.write('End Attitude')
     f.close()
 class Optimizer:
-    def __init__(self,stk_object,n_pop,n_gen,n_sats,weights = (7.0,-6,-1.0)):
+    def __init__(self,stk_object,n_pop,n_gen,n_sats,weights = (7.0,-6.0,-1.0,-1.0)):
         self.stk_object = stk_object
         self.n_pop = n_pop
         self.n_gen = n_gen
         self.n_sats = n_sats
         creator.create("FitnessMax", base.Fitness, weights=weights)
         creator.create("Satellite", list, fitness=creator.FitnessMax)
-        self.lower = [575,0,0,0,1]
-        self.upper = [630,180,180,180,self.n_sats]
+        self.lower = [575,0,0,0,0,1]
+        self.upper = [630,180,180,180,50,self.n_sats]
 
         # Registering variables to the satellite
         self.toolbox = base.Toolbox()
         self.toolbox.register("attr_alt", random.randint, self.lower[0], self.upper[0])
         self.toolbox.register("attr_inc", random.randint, self.lower[1], self.upper[1])
         self.toolbox.register("attr_aop", random.randint, self.lower[2], self.upper[2])
-        self.toolbox.register("attr_max_raan", random.randint, self.lower[3], self.upper[3])
-        self.toolbox.register("attr_num_planes", random.randint, self.lower[4], self.upper[4])
+        self.toolbox.register("attr_initial_raan", random.randint, self.lower[3], self.upper[3])
+        self.toolbox.register("attr_delta_raan", random.randint, self.lower[4], self.upper[4])
+        self.toolbox.register("attr_num_planes", random.randint, self.lower[5], self.upper[5])
 
         # Registering satellite to the model
         self.toolbox.register("satellite", tools.initCycle, creator.Satellite,
                         (self.toolbox.attr_alt,
                         self.toolbox.attr_inc,
                         self.toolbox.attr_aop,
-                        self.toolbox.attr_max_raan,
+                        self.toolbox.attr_initial_raan,
+                        self.toolbox.attr_delta_raan,
                         self.toolbox.attr_num_planes), n=1)
 
         # Registering tools for the algorithm
@@ -121,7 +123,7 @@ class Optimizer:
         i = np.random.randint(0,self.n_pop)
         if read:
             for idx in range(5):
-                pop[i][idx] = get_ind()[idx]
+                pop[i][idx] = get_ind(self.n_sats)[idx]
 
         fitnesses = list(map(self.toolbox.evaluate, pop))
         for ind, fit in zip(pop, fitnesses):
@@ -181,31 +183,33 @@ class Optimizer:
     def cost_function(self,Individual=[0,0,0,0,0,0],write=True):
         if write:
             self.Load_Individual(Individual)
-        satellites_filename = '../../Input_Files/Satellites_File.txt'
-        self.stk_object.Satellite_Loader(satellites_filename)
+        self.stk_object.Satellite_Loader(f'../../Input_Files/Satellites_File_{self.n_sats}.txt')
         self.stk_object.Compute_AzEl(self.enable_print)
         percentages = np.array([100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))])
-        times = np.array([self.stk_object.target_times[idx] for idx in range(len(self.stk_object.targets))])
-        return np.average(percentages),np.std(percentages),np.average(times)
+        times = np.array([self.stk_object.target_times[idx]/86400 for idx in range(len(self.stk_object.targets))])
+        return np.average(percentages),np.std(percentages),np.average(times),np.std(times)
     
     def Load_Individual(self,Individual=[0,0,0,0,0,0]):
         Alt = Individual[0]
         Inc = Individual[1]
         Aop = Individual[2]
         max_raan = Individual[3]
-        num_planes = int(Individual[4])
+        delta_raan = Individual[4]
+        num_planes = int(Individual[5])
         num_sats = self.n_sats
-        file = open("../../Input_Files/Satellites_File.txt","w")
+        file = open(f"../../Input_Files/Satellites_File_{num_sats}.txt","w")
         file.write("Per,Apo,Inc,AoP,Asc,Loc,Tar\n")
         sats = num_sats*[1]
         planes = np.array_split(sats,num_planes)
         Asc = 0
+        i=1
         for plane in planes:
             Loc = 0
             for sat in plane:
-                file.write(f"{Alt},{Alt},{Inc},{Aop},{round(Asc,4)},{round(Loc,4)},{1}\n")
-                if len(plane)>1: Loc += 360/(len(plane)-1)
-            if len(planes)>1:Asc += max_raan/(len(planes)-1)
+                file.write(f"{Alt},{Alt},{Inc},{Aop},{round(Asc%360,4)},{round(Loc,4)},{1}\n")
+                if len(plane)>1: Loc += 360/len(plane)
+            if len(planes)>1:Asc -= i*((-1)**(i))*delta_raan
+            i+=1
         file.close()
         
 def Interpolate(time,az,el):
@@ -260,7 +264,8 @@ def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rat
                 return bin_access_points[idx]
     return False
 
-def dfs_to_excel(excel_file, sheet_name, df1 = pd.read_csv("../../Input_Files/Satellites_File.txt"), df2 = False, df3 = False):
+def dfs_to_excel(excel_file, sheet_name, df2 = False, df3 = False):
+    df1 = pd.read_csv(f"../../Input_Files/Satellites_File_{n_sats}.txt")
     workbook = openpyxl.load_workbook(excel_file)
     if sheet_name in workbook.sheetnames:
         sheet = workbook[sheet_name]
