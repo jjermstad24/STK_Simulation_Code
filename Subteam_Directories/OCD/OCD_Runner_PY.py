@@ -8,14 +8,14 @@ print("Booting STK")
 stk_object = STK_Simulation(False,Filename)
 print("Loaded STK")
 
-n_pop = 5
+n_pop = 25
 n_gen = 5
-n_sats = 7
+n_sats = 6
 
 opt = Optimizer(stk_object,n_pop,n_gen,n_sats)
 
 stk_object.set_sim_time(days=5)
-stk_object.Target_Loader("../../Input_Files/Targets_34.txt")
+stk_object.Target_Loader("../../Input_Files/Target_Packages/Targets_34.txt")
 
 pd.read_csv(f"../../Input_Files/Constellations/{n_sats}.txt").to_csv("../../Input_Files/Satellites_File.txt",index=False)
 
