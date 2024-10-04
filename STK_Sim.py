@@ -222,8 +222,8 @@ class STK_Simulation:
                                         if (any(t[0] <= value <= t[1] for value in t_az[0]) or 
                                             any(t_az[0][0] <= value <= t_az[0][1] for value in t)):
                                             self.Update_Target_Bins(t_az[0][0],i*9+j,tar_num)
-                                            start_times.append(t_az[0][0]+.001)
-                                            stop_times.append(t_az[0][1]-.001)
+                                            start_times.append(t_az[0][0])
+                                            stop_times.append(t_az[0][1])
                                             bins.append(i*9+j)
                                             
                     access = sat.GetAccessToObject(tar)
@@ -237,20 +237,20 @@ class STK_Simulation:
         with alive_bar(len(self.targets)*324,force_tty=True,bar='classic',title='- Sorting_Data',length=10) as bar:
             for tar_num in range(len(self.targets)):
                 for bin_num in range(324):
-                    a = np.array(self.Pre_Planning_Hash_Map[tar_num][bin_num])
+                    a = np.array(self.Pre_Planning_Hash_Map[tar_num][bin_num]).astype(float)
                     if len(a) > 0:
                         self.Pre_Planning_Hash_Map[tar_num][bin_num] = a[a[:,0].argsort()]
                     bar()
         
         return 0
         
-    def Plan(self,slew_rate,cone_angle):
+    def Plan(self,slew_rate,cone_angle,time_threshold=6000):
         satellite_specific_plan = {key:{"Time":[],"Target":[],"Bin Number":[],"Cross Range":[],"Along Range":[]} for key in range(len(self.satellites))}
         bins = np.reshape([[[count,tar_num,bin_num] for bin_num,count in enumerate(tar_bin.ravel())] for tar_num,tar_bin in enumerate(self.target_bins)],[len(self.targets)*324,3]).astype(int)
         with alive_bar(324*len(self.targets),force_tty=True,bar='classic',title=f'- Planning',length=10) as bar:
             for count,tar_num,bin_num in bins[bins[:,0].argsort()]:
                 if count > 0:
-                    result = get_best_available_access(satellite_specific_plan,self.Pre_Planning_Hash_Map[tar_num][bin_num],slew_rate,cone_angle)
+                    result = get_best_available_access(satellite_specific_plan,self.Pre_Planning_Hash_Map[tar_num][bin_num],slew_rate,cone_angle,time_threshold)
                     if type(result)!=bool:
                         sat_num = int(result[3])
                         satellite_specific_plan[sat_num]["Time"].append(result[0])
