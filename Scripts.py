@@ -1,5 +1,4 @@
 import random
-import decimal
 import numpy as np
 import pandas as pd
 import datetime
@@ -264,8 +263,8 @@ def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rat
                 return bin_access_points[idx]
     return False
 
-def dfs_to_excel(excel_file, sheet_name, df2 = False, df3 = False):
-    df1 = pd.read_csv(f"../../Input_Files/Satellites_File_{n_sats}.txt")
+def dfs_to_excel(excel_file, sheet_name, n_sats, df2, df3):
+    df1 = pd.read_csv(f'../../Input_Files/Satellites_File_{n_sats}.txt')
     workbook = openpyxl.load_workbook(excel_file)
     if sheet_name in workbook.sheetnames:
         sheet = workbook[sheet_name]
@@ -286,28 +285,38 @@ def dfs_to_excel(excel_file, sheet_name, df2 = False, df3 = False):
             sheet.cell(row=i+15, column=j+1).value = row[key]
 
     workbook.save(excel_file)
+    return 0
 
 def Generate_Performance_Curve(file=r"H:/Shared drives/AERO 401 Project  L3Harris Team 1/Subteam Designs/OCD/Superstars.xlsx"):
     df = pd.read_excel(file)
-    df.columns = df.columns.str.strip()
-    df = df.drop('Average Time to 100%', axis=1)
-    df.replace({'#REF!': None}, inplace=True)
-    df.columns = df.iloc[0]  # Assign the first row to the column headers
-    df = df[1:].reset_index(drop=True) 
-    df = df.rename(columns={df.columns[0]: 'Number of Targets'})
+    df.columns = df.iloc[0]
+    df = df.drop(df.index[0])
 
     fig = go.Figure()
-
-    # Loop through each satellite column and add traces
+    max_targets = 0
     for column in df.columns[1:]:
+        col_df = df[df[column]>0]
+        
+        if len(col_df['Targets']) > 0:
+            max_targets = max(col_df['Targets']) if max_targets < max(col_df['Targets']) else max_targets
+
         fig.add_trace(go.Scatter(
-            x=df['Number of Targets'],
-            y=df[column],
+            x=col_df['Targets'],
+            y=col_df[column],
             mode='lines+markers',
-            name=column
+            name=str(column)
         ))
 
-    # Update layout
+    fig.add_trace(go.Scatter(
+        x=[10,max_targets+10],
+        y=[30,30],
+        mode = 'lines',
+        line=dict(dash='dash',
+                color='red',
+                width=3),
+        name='Constraint'
+    ))
+
     fig.update_layout(
         title='Constellation Performance Comparison',
         xaxis_title='Number of Targets',
@@ -318,8 +327,15 @@ def Generate_Performance_Curve(file=r"H:/Shared drives/AERO 401 Project  L3Harri
         width=1000
     )
 
-    # Show the plot
+    fig.add_annotation(
+        x=max_targets/1.5,  # Place it at the end of the constraint line
+        y=29,  # Y-coordinate on the line
+        text="30 Day Duration Constraint",  # Text annotation
+        showarrow=False,  # No arrow, just the text
+        font=dict(size=18, color='red'),  # Font size
+    )
     fig.show()
+    return 0
 
 def send_message_to_discord(channel_id, message, bot_token):
     nest_asyncio.apply()
@@ -333,9 +349,9 @@ def send_message_to_discord(channel_id, message, bot_token):
         else:
             print("Channel not found.")
         await bot.close()
-
     @bot.event
     async def on_ready():
         await send_message_and_exit()
         await bot.close()
     bot.run(bot_token)
+    return 0
