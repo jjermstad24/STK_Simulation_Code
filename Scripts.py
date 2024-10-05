@@ -321,7 +321,7 @@ def Generate_Performance_Curve(file=r"H:/Shared drives/AERO 401 Project  L3Harri
     # Show the plot
     fig.show()
 
-def send_message_to_discord(channel_id, message):
+def send_message_to_discord(channel_id, message, bot_token):
     nest_asyncio.apply()
     intents = discord.Intents.default()
     intents.message_content = True
@@ -338,5 +338,4 @@ def send_message_to_discord(channel_id, message):
     async def on_ready():
         await send_message_and_exit()
         await bot.close()
-    bot_token = "MTI5MjE4NjkxNDE5MDkxNzcyMg.G-OS3J.5XKlhD8mjlg-6VUxma0JgkHpB498JqzZHIVcAY"
     bot.run(bot_token)
