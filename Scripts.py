@@ -18,10 +18,10 @@ from IPython.display import clear_output
 import scipy.interpolate as interpolate
 import time
 import openpyxl
+import discord
+import nest_asyncio
+import asyncio
 
-def Random_Decimal(t):
-    lower,upper = t
-    return float(decimal.Decimal(random.randrange(lower*10000,upper*10000))/10000)
 
 def time_convert(date):
     fmt = "%d %b %Y %H:%M:%S.%f"
@@ -320,3 +320,23 @@ def Generate_Performance_Curve(file=r"H:/Shared drives/AERO 401 Project  L3Harri
 
     # Show the plot
     fig.show()
+
+def send_message_to_discord(channel_id, message):
+    nest_asyncio.apply()
+    intents = discord.Intents.default()
+    intents.message_content = True
+    bot = discord.Client(intents=intents)
+    async def send_message_and_exit():
+        channel = bot.get_channel(channel_id)
+        if channel is not None:
+            await channel.send(message)
+        else:
+            print("Channel not found.")
+        await bot.close()
+
+    @bot.event
+    async def on_ready():
+        await send_message_and_exit()
+        await bot.close()
+    bot_token = "MTI5MjE4NjkxNDE5MDkxNzcyMg.G-OS3J.5XKlhD8mjlg-6VUxma0JgkHpB498JqzZHIVcAY"
+    bot.run(bot_token)
