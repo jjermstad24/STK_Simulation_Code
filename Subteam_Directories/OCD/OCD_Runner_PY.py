@@ -14,7 +14,7 @@ n_sats = 8
 
 opt = Optimizer(stk_object,n_pop,n_gen,n_sats)
 
-stk_object.set_sim_time(days=30)
+stk_object.set_sim_time(days=1)
 stk_object.Target_Loader("../../Input_Files/Target_Packages/Targets_65.txt")
 
 pd.read_csv(f"../../Input_Files/Constellations/{n_sats}.txt").to_csv(f"../../Input_Files/Satellites_File_{n_sats}.txt",index=False)
@@ -41,4 +41,4 @@ for n_targets in [15,34,65,82,109,186,494]:
     data_comparison = pd.DataFrame(data_comparison)
 
     discord_message = f"```\n{round(pd.concat([data_comparison.describe().iloc[1:3], data_comparison.describe().iloc[[-1]]]),4).to_string()}\n```"
-    send_message_to_discord(channel_id=1203813613903675502,message=discord_message) # , bot_token=)
+    send_message_to_discord(channel_id=1203813613903675502,message=discord_message, bot_token="MTI5MjE4NjkxNDE5MDkxNzcyMg.GJARgd.byoS5IitEu7HVnzFh3ivV5bSdXL4-PCjOMb4ws")
