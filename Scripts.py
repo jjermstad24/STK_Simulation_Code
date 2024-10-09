@@ -112,7 +112,7 @@ class Optimizer:
         self.stats.register("min", np.min, axis=0)
         self.stats.register("max", np.max, axis=0)
 
-    def run(self,read=False,enable_print=False):
+    def run(self,read=False,enable_print=False,file=False):
         self.enable_print = enable_print
         self.fits = []
         CXPB = 0.7;MUTPB=0.3
@@ -140,7 +140,16 @@ class Optimizer:
         clear_output(wait=False)
         print("-- Generation %i --" % g)
         print(pd.DataFrame(record))
-
+        
+        if file:
+            file.write("Gen,Pop,Alt,Inc,Aop,Initial_Raan,Delta_Raan,Num_Planes,Avg_Percentage,Std_Percentage,Avg_Time,Std_Time\n")
+            for idx in range(self.n_pop):
+                file.write(f"{g},{idx},")
+                for i in range(6):
+                    file.write(f"{pop[idx][i]},")
+                for fit in pop[idx].fitness.getValues():
+                    file.write(f"{fit},")
+                file.write("\n")
         # Begin the evolution
         while g < self.n_gen:
             # clear_output(wait=True)
@@ -177,6 +186,16 @@ class Optimizer:
             clear_output(wait=False)
             print("-- Generation %i --" % g)
             print(pd.DataFrame(record))
+            
+            if file:
+                for idx in range(self.n_pop):
+                    file.write(f"{g},{idx},")
+                    for i in range(6):
+                        file.write(f"{pop[idx][i]},")
+                    for fit in pop[idx].fitness.getValues():
+                        file.write(f"{fit},")
+                    file.write("\n")
+                
         return hof
     
     def cost_function(self,Individual=[0,0,0,0,0,0],write=True):
