@@ -41,4 +41,4 @@ for n_targets in [15,34,65,82,109,186,494]:
     data_comparison = pd.DataFrame(data_comparison)
 
     discord_message = f"```\n{round(pd.concat([data_comparison.describe().iloc[1:3], data_comparison.describe().iloc[[-1]]]),4).to_string()}\n```"
-    send_message_to_discord(channel_id=1203813613903675502,message=discord_message, bot_token="MTI5MjE4NjkxNDE5MDkxNzcyMg.GJARgd.byoS5IitEu7HVnzFh3ivV5bSdXL4-PCjOMb4ws")
+    send_message_to_discord(channel_id=1203813613903675502,message=discord_message)
