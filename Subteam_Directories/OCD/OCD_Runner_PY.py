@@ -28,7 +28,7 @@ stk_object.set_sim_time(days=30)
 stk_object.dt = 60
 
 for n_targets in [15,34,65,82,109,186,494]:
-
+    stk_object.Target_Loader(f"../../Input_Files/Target_Packages/Targets_{n_targets}.txt")
     stk_object.Generate_Pre_Planning_Data()
     stk_object.Plan(1,20)
 
