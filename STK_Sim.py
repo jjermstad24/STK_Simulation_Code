@@ -105,6 +105,7 @@ class STK_Simulation:
         return 0
 
     def Compute_AzEl(self,enable_print=True):
+        self.root.ExecuteCommand("ClearAllAccess /")
         az_range = list(range(0,360,10))
         el_range = list(range(0,90,10))
 
@@ -188,6 +189,7 @@ class STK_Simulation:
             sat.MassProperties.Inertia.Izz = I[2][2]
 
     def Generate_Pre_Planning_Data(self):
+        self.root.ExecuteCommand("ClearAllAccess /")
         az_range = list(range(0,360,10))
         el_range = list(range(0,90,10))
 
