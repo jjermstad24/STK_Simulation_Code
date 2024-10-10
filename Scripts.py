@@ -142,7 +142,7 @@ class Optimizer:
         print(pd.DataFrame(record))
         
         if file:
-            file.write("Gen,Pop,Alt,Inc,Aop,Initial_Raan,Delta_Raan,Num_Planes,Avg_Percentage,Std_Percentage,Avg_Time,Std_Time\n")
+            file.write("Gen,Pop,Alt,Inc,Aop,Initial_Raan,Delta_Raan,Num_Planes,Avg_Percentage,Std_Percentage,Avg_Time,Std_Time,\n")
             for idx in range(self.n_pop):
                 file.write(f"{g},{idx},")
                 for i in range(6):
