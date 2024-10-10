@@ -77,7 +77,6 @@ class STK_Simulation:
 
             # Assign the other desired orbital parameters:
             keplerian.Orientation.Inclination = float(data['Inc'][satellite_num])               # deg
-            keplerian.Orientation.ArgOfPerigee = float(data['AoP'][satellite_num])        # deg
             keplerian.Orientation.AscNode.Value = float(data['Asc'][satellite_num])            # deg
             keplerian.Location.Value = float(data['Loc'][satellite_num])                             # deg
 

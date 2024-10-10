@@ -79,23 +79,21 @@ class Optimizer:
         self.n_sats = n_sats
         creator.create("FitnessMax", base.Fitness, weights=weights)
         creator.create("Satellite", list, fitness=creator.FitnessMax)
-        self.lower = [575,0,0,0,0,1]
-        self.upper = [630,180,180,180,50,self.n_sats]
+        self.lower = [575,0,0,0,1]
+        self.upper = [630,180,180,50,self.n_sats]
 
         # Registering variables to the satellite
         self.toolbox = base.Toolbox()
         self.toolbox.register("attr_alt", random.randint, self.lower[0], self.upper[0])
         self.toolbox.register("attr_inc", random.randint, self.lower[1], self.upper[1])
-        self.toolbox.register("attr_aop", random.randint, self.lower[2], self.upper[2])
-        self.toolbox.register("attr_initial_raan", random.randint, self.lower[3], self.upper[3])
-        self.toolbox.register("attr_delta_raan", random.randint, self.lower[4], self.upper[4])
-        self.toolbox.register("attr_num_planes", random.randint, self.lower[5], self.upper[5])
+        self.toolbox.register("attr_initial_raan", random.randint, self.lower[2], self.upper[2])
+        self.toolbox.register("attr_delta_raan", random.randint, self.lower[3], self.upper[3])
+        self.toolbox.register("attr_num_planes", random.randint, self.lower[4], self.upper[4])
 
         # Registering satellite to the model
         self.toolbox.register("satellite", tools.initCycle, creator.Satellite,
                         (self.toolbox.attr_alt,
                         self.toolbox.attr_inc,
-                        self.toolbox.attr_aop,
                         self.toolbox.attr_initial_raan,
                         self.toolbox.attr_delta_raan,
                         self.toolbox.attr_num_planes), n=1)
@@ -130,10 +128,6 @@ class Optimizer:
         hof = tools.HallOfFame(5)
         hof.update(pop)
 
-        percent = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
-        std =  {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
-        time = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
-
         self.fits.append([ind.fitness.values for ind in pop])
         record = self.stats.compile(pop)
 
@@ -142,12 +136,12 @@ class Optimizer:
         print(pd.DataFrame(record))
         
         if file:
-            file.write("Gen,Pop,Alt,Inc,Aop,Initial_Raan,Delta_Raan,Num_Planes,Avg_Percentage,Std_Percentage,Avg_Time,Std_Time,\n")
-            for idx in range(self.n_pop):
-                file.write(f"{g},{idx},")
-                for i in range(6):
-                    file.write(f"{pop[idx][i]},")
-                for fit in pop[idx].fitness.getValues():
+            file.write("Gen,Pop,Alt,Inc,Initial_Raan,Delta_Raan,Num_Planes,Avg_Percentage,Std_Percentage,Avg_Time,Std_Time,\n")
+            for i in range(self.n_pop):
+                file.write(f"{g},{i},")
+                for idx in range(5):
+                    file.write(f"{pop[i][idx]},")
+                for fit in pop[i].fitness.getValues():
                     file.write(f"{fit},")
                 file.write("\n")
         # Begin the evolution
@@ -188,17 +182,17 @@ class Optimizer:
             print(pd.DataFrame(record))
             
             if file:
-                for idx in range(self.n_pop):
-                    file.write(f"{g},{idx},")
-                    for i in range(6):
-                        file.write(f"{pop[idx][i]},")
-                    for fit in pop[idx].fitness.getValues():
+                for i in range(self.n_pop):
+                    file.write(f"{g},{i},")
+                    for idx in range(5):
+                        file.write(f"{pop[i][idx]},")
+                    for fit in pop[i].fitness.getValues():
                         file.write(f"{fit},")
                     file.write("\n")
                 
         return hof
     
-    def cost_function(self,Individual=[0,0,0,0,0,0],write=True):
+    def cost_function(self,Individual=[0,0,0,0,0],write=True):
         if write:
             self.Load_Individual(Individual)
         self.stk_object.Satellite_Loader(f'../../Input_Files/Satellites_File_{self.n_sats}.txt')
@@ -207,24 +201,23 @@ class Optimizer:
         times = np.array([self.stk_object.target_times[idx]/86400 for idx in range(len(self.stk_object.targets))])
         return np.average(percentages),np.std(percentages),np.average(times),np.std(times)
     
-    def Load_Individual(self,Individual=[0,0,0,0,0,0]):
+    def Load_Individual(self,Individual=[0,0,0,0,0]):
         Alt = Individual[0]
         Inc = Individual[1]
-        Aop = Individual[2]
-        max_raan = Individual[3]
-        delta_raan = Individual[4]
-        num_planes = int(Individual[5])
+        initial_raan = Individual[2]
+        delta_raan = Individual[3]
+        num_planes = int(Individual[4])
         num_sats = self.n_sats
+        Asc = initial_raan
         file = open(f"../../Input_Files/Satellites_File_{num_sats}.txt","w")
-        file.write("Per,Apo,Inc,AoP,Asc,Loc,Tar\n")
+        file.write("Per,Apo,Inc,Asc,Loc\n")
         sats = num_sats*[1]
         planes = np.array_split(sats,num_planes)
-        Asc = 0
         i=1
         for plane in planes:
             Loc = 0
             for sat in plane:
-                file.write(f"{Alt},{Alt},{Inc},{Aop},{round(Asc%360,4)},{round(Loc,4)},{1}\n")
+                file.write(f"{Alt},{Alt},{Inc},{round(Asc%360,4)},{round(Loc,4)}\n")
                 if len(plane)>1: Loc += 360/len(plane)
             if len(planes)>1:Asc -= i*((-1)**(i))*delta_raan
             i+=1
