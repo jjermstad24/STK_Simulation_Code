@@ -36,4 +36,4 @@ for n_targets in [15,34,65,82,109,186,494]:
     data_comparison["Unplanned (Time)"] = [np.max(stk_object.target_times[tar_num])/86400 for tar_num in range(len(stk_object.targets))]
     pd.DataFrame(data_comparison).to_csv(f"../../Optimization_Results/{n_sats}_{n_targets}.csv",index=False)
     data_comparison = pd.DataFrame(data_comparison)
-    send_message_to_discord(message='',channel_id=1203039501664915547, bot_token='MTI5MjE4NjkxNDE5MDkxNzcyMg.GA_niH.gVHbMuMTG7I2cqg20pezJIU3Rp9OCF4pbC7lno')
+    send_message_to_discord(message='',channel_id=1203813613903675502)
