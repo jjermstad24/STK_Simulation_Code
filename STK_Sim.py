@@ -293,3 +293,18 @@ class STK_Simulation:
         stop_time=(start_time+duration).strftime("%d %b %Y %H:%M:%S.%f")
         self.root.CurrentScenario.StopTime=stop_time
         self.root.UnitPreferences.SetCurrentUnit("DateFormat", "EpSec")
+
+    def Results_Runner(self, Plan=True):
+        self.Generate_Pre_Planning_Data()
+        if Plan:
+            self.Plan(1,20)
+
+    def Create_Data_Comparison_df(self, Unplanned=True, Planned=True):
+        data_comparison = {}
+        if Unplanned:
+            data_comparison["Unplanned (%)"] = [len(np.unique(self.Holding_Data[self.Holding_Data['Target'].values==tar_num]['Bin Number'].values))/324*100 for tar_num in range(len(self.targets))]
+            data_comparison["Unplanned (Time)"] = [max(self.Holding_Data[self.Holding_Data['Target'].values==tar_num]['Time'].values)/86400 for tar_num in range(len(self.targets))]
+        if Planned:
+            data_comparison["Planned (%)"] = [len(np.unique(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Bin Number'].values))/324*100 for tar_num in range(len(self.targets))]
+            data_comparison["Planned (Time)"] = [max(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Time'].values)/86400 for tar_num in range(len(self.targets))]
+        self.data_comparison = pd.DataFrame(data_comparison)
