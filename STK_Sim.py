@@ -57,6 +57,7 @@ class STK_Simulation:
     def Satellite_Loader(self,Filename,External_Pointing_File=False):
         self.satellites = []
         self.radars = []
+        # self.transmitter = []
         for satellite in self.root.CurrentScenario.Children.GetElements(AgESTKObjectType.eSatellite):
             satellite.Unload()
 
@@ -91,6 +92,8 @@ class STK_Simulation:
             # self.radars[satellite_num].SetPointingType(5)
             # for j in self.targets:
             #     self.radars[satellite_num].Pointing.Targets.Add(f'*/Target/{j}')
+            
+            # self.transmitter.append(transmitter)
 
     def Reset_Target_Bins(self):
         for idx in range(len(self.targets)):
