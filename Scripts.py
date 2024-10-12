@@ -79,8 +79,8 @@ class Optimizer:
         self.n_sats = n_sats
         creator.create("FitnessMax", base.Fitness, weights=weights)
         creator.create("Satellite", list, fitness=creator.FitnessMax)
-        self.lower = [575,0,0,0,1]
-        self.upper = [630,180,180,50,self.n_sats]
+        self.lower = [575,45,0,0,1]
+        self.upper = [630,135,180,50,self.n_sats]
 
         # Registering variables to the satellite
         self.toolbox = base.Toolbox()
