@@ -39,7 +39,7 @@ def Create_Poly(filename):
 
 def get_ind(n_sats):
     df = pd.read_csv(f"../../Input_Files/Satellites_File_{n_sats}.txt")
-    return [df["Per"].values[0],df["Inc"].values[0],df["AoP"].values[0],max(df["Asc"]),len(np.unique(df["Asc"]))]
+    return [df["Per"].values[0],df["Inc"].values[0],max(df["Asc"]),len(np.unique(df["Loc"]))]
 
 def plot_targets_and_polygon(poly,filename):
     df = pd.read_csv(filename)
@@ -119,7 +119,7 @@ class Optimizer:
         pop = self.toolbox.population(n=self.n_pop)
         i = np.random.randint(0,self.n_pop)
         if read:
-            for idx in range(5):
+            for idx in range(4):
                 pop[i][idx] = get_ind(self.n_sats)[idx]
 
         fitnesses = list(map(self.toolbox.evaluate, pop))
@@ -139,7 +139,7 @@ class Optimizer:
             file.write("Gen,Pop,Alt,Inc,Initial_Raan,Delta_Raan,Num_Planes,Avg_Percentage,Std_Percentage,Avg_Time,Std_Time,\n")
             for i in range(self.n_pop):
                 file.write(f"{g},{i},")
-                for idx in range(5):
+                for idx in range(4):
                     file.write(f"{pop[i][idx]},")
                 for fit in pop[i].fitness.getValues():
                     file.write(f"{fit},")
