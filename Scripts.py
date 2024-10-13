@@ -139,7 +139,7 @@ class Optimizer:
             file.write("Gen,Pop,Alt,Inc,Initial_Raan,Delta_Raan,Num_Planes,Avg_Percentage,Std_Percentage,Avg_Time,Std_Time,\n")
             for i in range(self.n_pop):
                 file.write(f"{g},{i},")
-                for idx in range(4):
+                for idx in range(5):
                     file.write(f"{pop[i][idx]},")
                 for fit in pop[i].fitness.getValues():
                     file.write(f"{fit},")
