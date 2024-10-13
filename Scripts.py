@@ -119,7 +119,7 @@ class Optimizer:
         pop = self.toolbox.population(n=self.n_pop)
         i = np.random.randint(0,self.n_pop)
         if read:
-            for idx in range(4):
+            for idx in range(5):
                 pop[i][idx] = get_ind(self.n_sats)[idx]
 
         fitnesses = list(map(self.toolbox.evaluate, pop))
