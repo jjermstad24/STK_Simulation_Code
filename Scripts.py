@@ -5,6 +5,7 @@ import datetime
 from shapely.geometry import Polygon, Point
 import plotly.graph_objects as go
 import plotly.express as px
+from plotly.subplots import make_subplots
 import os, sys
 import plotly.offline
 from dataclasses import dataclass, field
@@ -182,7 +183,6 @@ class Optimizer:
                     for fit in pop[i].fitness.getValues():
                         file.write(f"{fit},")
                     file.write("\n")
-                
         return hof
     
     def cost_function(self,Individual=[0,0,0,0,0],write=True):
@@ -268,12 +268,13 @@ def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rat
                 return bin_access_points[idx]
     return False
 
-def Generate_Performance_Curve(cost_curve_dict, xaxis_title='Number of Targets', yaxis_title='Max_Time',plot_title='Constellation Performance Comparison'):
+def Generate_Performance_Curve(cost_curve_dicts, curve_type='Optimization', xaxis='Number of Targets', yaxis='Avg_time'):
+    
     fig = go.Figure()
-    for n_sats, n_sats_df in cost_curve_dict.items():
+    for n_sats, n_sats_df in cost_curve_dicts[curve_type].items():
         fig.add_trace(go.Scatter(
-            x=n_sats_df[xaxis_title],
-            y=n_sats_df[yaxis_title],
+            x=n_sats_df[xaxis],
+            y=n_sats_df[yaxis],
             mode='lines+markers',
             name=str(n_sats)
         ))
@@ -281,9 +282,9 @@ def Generate_Performance_Curve(cost_curve_dict, xaxis_title='Number of Targets',
     fig.add_hline(30, line_dash='dash', line_color='red')
     fig.add_annotation(x=100, y=32, text='30 Day Constraint', font=dict(color='red', size=15), showarrow=False)
     fig.update_layout(
-        title=plot_title,
-        xaxis_title=xaxis_title,
-        yaxis_title=yaxis_title,
+        title=f'{curve_type} {yaxis} vs. {xaxis}',
+        xaxis_title=xaxis,
+        yaxis_title=yaxis,
         legend_title='Number of Satellites',
         template='plotly',
         height=600,
