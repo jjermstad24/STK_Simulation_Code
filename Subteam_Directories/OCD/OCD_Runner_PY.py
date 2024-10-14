@@ -12,6 +12,9 @@ n_pop = 25
 n_gen = 5
 n_sats = 6
 
+channel_id = 1203813613903675502
+bot_token=3
+
 opt = Optimizer(stk_object,n_pop,n_gen,n_sats)
 
 stk_object.set_sim_time(days=5)
