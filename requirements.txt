@@ -1,0 +1,14 @@
+random2
+numpy
+pandas
+datetime
+shapely
+plotly
+alive-progress
+deap
+scipy
+pointpats
+openpyxl
+ipykernel
+discord.py
+C:\Program Files\AGI\STK 12\bin\AgPythonAPI\agi.stk12-12.5.0-py3-none-any.whl

@@ -57,6 +57,7 @@ class STK_Simulation:
     def Satellite_Loader(self,Filename,External_Pointing_File=False):
         self.satellites = []
         self.radars = []
+        # self.transmitter = []
         for satellite in self.root.CurrentScenario.Children.GetElements(AgESTKObjectType.eSatellite):
             satellite.Unload()
 
@@ -77,7 +78,6 @@ class STK_Simulation:
 
             # Assign the other desired orbital parameters:
             keplerian.Orientation.Inclination = float(data['Inc'][satellite_num])               # deg
-            keplerian.Orientation.ArgOfPerigee = float(data['AoP'][satellite_num])        # deg
             keplerian.Orientation.AscNode.Value = float(data['Asc'][satellite_num])            # deg
             keplerian.Location.Value = float(data['Loc'][satellite_num])                             # deg
 
@@ -92,6 +92,8 @@ class STK_Simulation:
             # self.radars[satellite_num].SetPointingType(5)
             # for j in self.targets:
             #     self.radars[satellite_num].Pointing.Targets.Add(f'*/Target/{j}')
+            
+            # self.transmitter.append(transmitter)
 
     def Reset_Target_Bins(self):
         for idx in range(len(self.targets)):
@@ -105,6 +107,7 @@ class STK_Simulation:
         return 0
 
     def Compute_AzEl(self,enable_print=True):
+        self.root.ExecuteCommand("ClearAllAccess /")
         az_range = list(range(0,360,10))
         el_range = list(range(0,90,10))
 
@@ -188,6 +191,7 @@ class STK_Simulation:
             sat.MassProperties.Inertia.Izz = I[2][2]
 
     def Generate_Pre_Planning_Data(self):
+        self.root.ExecuteCommand("ClearAllAccess /")
         az_range = list(range(0,360,10))
         el_range = list(range(0,90,10))
 
@@ -289,3 +293,18 @@ class STK_Simulation:
         stop_time=(start_time+duration).strftime("%d %b %Y %H:%M:%S.%f")
         self.root.CurrentScenario.StopTime=stop_time
         self.root.UnitPreferences.SetCurrentUnit("DateFormat", "EpSec")
+
+    def Results_Runner(self, Plan=True):
+        self.Generate_Pre_Planning_Data()
+        if Plan:
+            self.Plan(1,20)
+
+    def Create_Data_Comparison_df(self, Unplanned=True, Planned=True):
+        data_comparison = {}
+        if Unplanned:
+            data_comparison["Unplanned (%)"] = [np.count_nonzero(self.target_bins[tar_num])/324*100 for tar_num in range(len(self.targets))]
+            data_comparison["Unplanned (Time)"] = [np.max(self.target_times[tar_num])/86400 for tar_num in range(len(self.targets))]
+        if Planned:
+            data_comparison["Planned (%)"] = [len(np.unique(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Bin Number'].values))/324*100 for tar_num in range(len(self.targets))]
+            data_comparison["Planned (Time)"] = [max(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Time'].values)/86400 for tar_num in range(len(self.targets))]
+        self.data_comparison = pd.DataFrame(data_comparison)
