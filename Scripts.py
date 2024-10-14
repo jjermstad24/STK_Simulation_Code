@@ -16,7 +16,6 @@ from deap import tools
 from IPython.display import clear_output
 import scipy.interpolate as interpolate
 import time
-import openpyxl
 import discord
 import nest_asyncio
 import asyncio
@@ -64,13 +63,7 @@ def plot_targets_and_polygon(poly,filename):
             'zoom': 0})
     return fig
 
-def Pointing_File_Generator(filename,period):
-    f = open(filename,"w")
-    f.write("stk.v.12.1.1\nBegin\tAttitude\nNumberofAttitudePoints\t162\nSequence\t323\nRepeatPattern\n")
-    for i in range(162):
-        f.write(f'{period/162*(i+1)} {(i%9+1)*10-5} {(i//9+1)*10-5}\n')
-    f.write('End Attitude')
-    f.close()
+
 class Optimizer:
     def __init__(self,stk_object,n_pop,n_gen,n_sats,weights = (7.0,-6.0,-1.0,-1.0)):
         self.stk_object = stk_object
@@ -119,7 +112,7 @@ class Optimizer:
         pop = self.toolbox.population(n=self.n_pop)
         i = np.random.randint(0,self.n_pop)
         if read:
-            for idx in range(5):
+            for idx in range(4):
                 pop[i][idx] = get_ind(self.n_sats)[idx]
 
         fitnesses = list(map(self.toolbox.evaluate, pop))
@@ -275,76 +268,26 @@ def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rat
                 return bin_access_points[idx]
     return False
 
-def dfs_to_excel(excel_file, sheet_name, n_sats, df2, df3):
-    df1 = pd.read_csv(f'../../Input_Files/Satellites_File_{n_sats}.txt')
-    workbook = openpyxl.load_workbook(excel_file)
-    if sheet_name in workbook.sheetnames:
-        sheet = workbook[sheet_name]
-    else:
-        sheet = workbook.create_sheet(sheet_name)
-
-    for i, row in df1.iterrows():
-        for j, key in enumerate(df1.columns):
-            sheet.cell(row=1, column=j+1).value = key
-            sheet.cell(row=i+2, column=j+1).value = row[key]
-    for i, row in df2.iterrows():
-        for j, key in enumerate(df2.columns):
-            sheet.cell(row=1, column=j+len(df1.columns)+2).value = key
-            sheet.cell(row=i+2, column=j+len(df1.columns)+2).value = row[key]
-
-    for i, row in df3.iterrows():
-        for j, key in enumerate(df3.columns):
-            sheet.cell(row=i+15, column=j+1).value = row[key]
-
-    workbook.save(excel_file)
-    return 0
-
-def Generate_Performance_Curve(file=r"H:/Shared drives/AERO 401 Project  L3Harris Team 1/Subteam Designs/OCD/Superstars.xlsx"):
-    df = pd.read_excel(file)
-    df.columns = df.iloc[0]
-    df = df.drop(df.index[0])
-
+def Generate_Performance_Curve(cost_curve_dict, xaxis_title='Number of Targets', yaxis_title='Max_Time',plot_title='Constellation Performance Comparison'):
     fig = go.Figure()
-    max_targets = 0
-    for column in df.columns[1:]:
-        col_df = df[df[column]>0]
-        
-        if len(col_df['Targets']) > 0:
-            max_targets = max(col_df['Targets']) if max_targets < max(col_df['Targets']) else max_targets
-
+    for n_sats, n_sats_df in cost_curve_dict.items():
         fig.add_trace(go.Scatter(
-            x=col_df['Targets'],
-            y=col_df[column],
+            x=n_sats_df[xaxis_title],
+            y=n_sats_df[yaxis_title],
             mode='lines+markers',
-            name=str(column)
+            name=str(n_sats)
         ))
 
-    fig.add_trace(go.Scatter(
-        x=[10,max_targets+10],
-        y=[30,30],
-        mode = 'lines',
-        line=dict(dash='dash',
-                color='red',
-                width=3),
-        name='Constraint'
-    ))
-
+    fig.add_hline(30, line_dash='dash', line_color='red')
+    fig.add_annotation(x=100, y=32, text='30 Day Constraint', font=dict(color='red', size=15), showarrow=False)
     fig.update_layout(
-        title='Constellation Performance Comparison',
-        xaxis_title='Number of Targets',
-        yaxis_title='Average Days to 100%',
+        title=plot_title,
+        xaxis_title=xaxis_title,
+        yaxis_title=yaxis_title,
         legend_title='Number of Satellites',
         template='plotly',
         height=600,
         width=1000
-    )
-
-    fig.add_annotation(
-        x=max_targets/1.5,  # Place it at the end of the constraint line
-        y=29,  # Y-coordinate on the line
-        text="30 Day Duration Constraint",  # Text annotation
-        showarrow=False,  # No arrow, just the text
-        font=dict(size=18, color='red'),  # Font size
     )
     fig.show()
     return 0
