@@ -291,7 +291,6 @@ def Generate_Performance_Curve(cost_curve_dicts, curve_type='Optimization', xaxi
         width=1000
     )
     fig.show()
-    return 0
 
 def send_message_to_discord(channel_id, message, bot_token):
     nest_asyncio.apply()
