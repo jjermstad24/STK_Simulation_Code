@@ -73,7 +73,7 @@ def Pointing_File_Generator(filename,period):
     f.write('End Attitude')
     f.close()
 class Optimizer:
-    def __init__(self,stk_object,n_pop,n_gen,n_sats,weights = (7.0,-7.0,-1.0)):
+    def __init__(self,stk_object,n_pop,n_gen,n_sats,weights = (7.0,-6,-1.0)):
         self.stk_object = stk_object
         self.n_pop = n_pop
         self.n_gen = n_gen
@@ -111,7 +111,8 @@ class Optimizer:
         self.stats.register("min", np.min, axis=0)
         self.stats.register("max", np.max, axis=0)
 
-    def run(self,read=False):
+    def run(self,read=False,enable_print=False):
+        self.enable_print = enable_print
         self.fits = []
         CXPB = 0.7;MUTPB=0.3
         g = 0
@@ -127,9 +128,6 @@ class Optimizer:
             ind.fitness.values = fit
         hof = tools.HallOfFame(5)
         hof.update(pop)
-
-        print(pop[i])
-        print(pop[i].fitness)
 
         percent = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
         std =  {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
@@ -178,34 +176,37 @@ class Optimizer:
             clear_output(wait=False)
             print("-- Generation %i --" % g)
             print(pd.DataFrame(record))
-        return hof,percent,std,time
+        return hof
     
-    def cost_function(self,Individual=[0,0,0,0,0,0],write=True,enable_print=False):
+    def cost_function(self,Individual=[0,0,0,0,0,0],write=True):
+        if write:
+            self.Load_Individual(Individual)
+        satellites_filename = '../../Input_Files/Satellites_File.txt'
+        self.stk_object.Satellite_Loader(satellites_filename)
+        self.stk_object.Compute_AzEl(self.enable_print)
+        percentages = np.array([100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))])
+        times = np.array([self.stk_object.target_times[idx] for idx in range(len(self.stk_object.targets))])
+        return np.average(percentages),np.std(percentages),np.average(times)
+    
+    def Load_Individual(self,Individual=[0,0,0,0,0,0]):
         Alt = Individual[0]
         Inc = Individual[1]
         Aop = Individual[2]
         max_raan = Individual[3]
         num_planes = int(Individual[4])
         num_sats = self.n_sats
-        if write:
-            file = open("../../Input_Files/Satellites_File.txt","w")
-            file.write("Per,Apo,Inc,AoP,Asc,Loc,Tar\n")
-            sats = num_sats*[1]
-            planes = np.array_split(sats,num_planes)
-            Asc = 0
-            for plane in planes:
-                Loc = 0
-                for sat in plane:
-                    file.write(f"{Alt},{Alt},{Inc},{Aop},{round(Asc,4)},{round(Loc,4)},{1}\n")
-                    if len(plane)>1: Loc += 360/(len(plane)-1)
-                if len(planes)>1:Asc += max_raan/(len(planes)-1)
-            file.close()
-        satellites_filename = '../../Input_Files/Satellites_File.txt'
-        self.stk_object.Satellite_Loader(satellites_filename)
-        self.stk_object.Compute_AzEl(enable_print)
-        percentages = np.array([100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))])
-        times = np.array([self.stk_object.target_times[idx] for idx in range(len(self.stk_object.targets))])
-        return np.average(percentages),np.std(percentages),np.max(times)
+        file = open("../../Input_Files/Satellites_File.txt","w")
+        file.write("Per,Apo,Inc,AoP,Asc,Loc,Tar\n")
+        sats = num_sats*[1]
+        planes = np.array_split(sats,num_planes)
+        Asc = 0
+        for plane in planes:
+            Loc = 0
+            for sat in plane:
+                file.write(f"{Alt},{Alt},{Inc},{Aop},{round(Asc,4)},{round(Loc,4)},{1}\n")
+                if len(plane)>1: Loc += 360/(len(plane)-1)
+            if len(planes)>1:Asc += max_raan/(len(planes)-1)
+        file.close()
         
 def Interpolate(time,az,el):
     times = np.arange(time[0],time[-1],2.5)
@@ -242,13 +243,14 @@ def check_manueverability(previous_times,
     else:
         return [[False]]
 
-def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rate,cone_angle):
+def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rate,cone_angle,time_threshold):
     if len(bin_access_points)>0:
         for idx in range(len(bin_access_points)):
             previous_sat_accesses = satellite_specific_plan[int(bin_access_points[idx,3])]
-            feasible = check_manueverability(np.array(previous_sat_accesses["Time"]),
-                                             np.array(previous_sat_accesses["Cross Range"]),
-                                             np.array(previous_sat_accesses["Along Range"]),
+            window = [i for i, t in enumerate(previous_sat_accesses["Time"]) if abs(t - bin_access_points[idx,0]) <= time_threshold]
+            feasible = check_manueverability(np.array(previous_sat_accesses["Time"])[window],
+                                             np.array(previous_sat_accesses["Cross Range"])[window],
+                                             np.array(previous_sat_accesses["Along Range"])[window],
                                              bin_access_points[idx,0],
                                              bin_access_points[idx,1],
                                              bin_access_points[idx,2],
