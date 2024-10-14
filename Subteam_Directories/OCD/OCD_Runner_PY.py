@@ -9,16 +9,13 @@ stk_object = STK_Simulation(False,Filename)
 print("Loaded STK")
 
 n_pop = 25
-n_gen = 10
-n_sats = 3
-
-channel_id=1203813613903675502
-bot_token=3
+n_gen = 5
+n_sats = 6
 
 opt = Optimizer(stk_object,n_pop,n_gen,n_sats)
 
-stk_object.set_sim_time(days=0, hours=1)
-stk_object.Target_Loader("../../Input_Files/Target_Packages/Targets_15.txt")
+stk_object.set_sim_time(days=5)
+stk_object.Target_Loader("../../Input_Files/Target_Packages/Targets_34.txt")
 
 pd.read_csv(f"../../Input_Files/Constellations/{n_sats}.txt").to_csv(f"../../Input_Files/Satellites_File_{n_sats}.txt",index=False)
 
