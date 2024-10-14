@@ -8,30 +8,27 @@ print("Booting STK")
 stk_object = STK_Simulation(False,Filename)
 print("Loaded STK")
 
-n_pop = 25
-n_gen = 5
-n_sats = 6
+n_pop = int(input('n_pop: '))
+n_gen = int(input('n_gen: '))
+n_sats = int(input('n_sats: '))
+duration = int(input('duration (days): '))
+optimize = input('Run new optimization? (T/F)')
 
 channel_id = 1203813613903675502
 bot_token=3
 
-opt = Optimizer(stk_object,n_pop,n_gen,n_sats)
-
-stk_object.set_sim_time(days=30)
-stk_object.Target_Loader("../../Input_Files/Target_Packages/Targets_65.txt")
-
-pd.read_csv(f"../../Input_Files/Constellations/{n_sats}.txt").to_csv(f"../../Input_Files/Satellites_File_{n_sats}.txt",index=False)
-
-print("Beginning Optimization")
-with open(f"../../Pop_Over_Gen/{n_sats}.csv","w") as f:
-    hof = opt.run(read=True,enable_print=True,file=f)
-
-send_message_to_discord(message=f'{n_sats} Optimization Complete',channel_id=channel_id,bot_token=bot_token)
-
-opt.Load_Individual(hof[0])
-
-stk_object.set_sim_time(days=30)
-stk_object.dt = 60
+stk_object.set_sim_time(days=duration)
+if optimize == 'T':
+    opt = Optimizer(stk_object,n_pop,n_gen,n_sats)
+    stk_object.Target_Loader("../../Input_Files/Target_Packages/Targets_65.txt")
+    pd.read_csv(f"../../Input_Files/Constellations/{n_sats}.txt").to_csv(f"../../Input_Files/Satellites_File_{n_sats}.txt",index=False)
+    print("Beginning Optimization")
+    with open(f"../../Pop_Over_Gen/{n_sats}.csv","w") as f:
+        hof = opt.run(read=True,enable_print=True,file=f)
+    send_message_to_discord(message=f'{n_sats} Optimization Complete',channel_id=channel_id,bot_token=bot_token)
+    opt.Load_Individual(hof[0])
+else:
+    stk_object.Satellite_Loader(f"../../Input_Files/Satellites_File_{n_sats}.txt")
 
 discord_message = [[f'Targets', 'Avg Unplanned %', 'Max Unplanned Time']]
 
