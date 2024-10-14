@@ -17,9 +17,7 @@ from IPython.display import clear_output
 import scipy.interpolate as interpolate
 import time
 import openpyxl
-import discord
-import nest_asyncio
-import asyncio
+# import discord
 
 
 def time_convert(date):
@@ -64,13 +62,7 @@ def plot_targets_and_polygon(poly,filename):
             'zoom': 0})
     return fig
 
-def Pointing_File_Generator(filename,period):
-    f = open(filename,"w")
-    f.write("stk.v.12.1.1\nBegin\tAttitude\nNumberofAttitudePoints\t162\nSequence\t323\nRepeatPattern\n")
-    for i in range(162):
-        f.write(f'{period/162*(i+1)} {(i%9+1)*10-5} {(i//9+1)*10-5}\n')
-    f.write('End Attitude')
-    f.close()
+
 class Optimizer:
     def __init__(self,stk_object,n_pop,n_gen,n_sats,weights = (7.0,-6.0,-1.0,-1.0)):
         self.stk_object = stk_object
@@ -139,7 +131,7 @@ class Optimizer:
             file.write("Gen,Pop,Alt,Inc,Initial_Raan,Delta_Raan,Num_Planes,Avg_Percentage,Std_Percentage,Avg_Time,Std_Time,\n")
             for i in range(self.n_pop):
                 file.write(f"{g},{i},")
-                for idx in range(4):
+                for idx in range(5):
                     file.write(f"{pop[i][idx]},")
                 for fit in pop[i].fitness.getValues():
                     file.write(f"{fit},")
@@ -349,21 +341,21 @@ def Generate_Performance_Curve(file=r"H:/Shared drives/AERO 401 Project  L3Harri
     fig.show()
     return 0
 
-def send_message_to_discord(channel_id, message, bot_token):
-    nest_asyncio.apply()
-    intents = discord.Intents.default()
-    intents.message_content = True
-    bot = discord.Client(intents=intents)
-    async def send_message_and_exit():
-        channel = bot.get_channel(channel_id)
-        if channel is not None:
-            await channel.send(message)
-        else:
-            print("Channel not found.")
-        await bot.close()
-    @bot.event
-    async def on_ready():
-        await send_message_and_exit()
-        await bot.close()
-    bot.run(bot_token)
-    return 0
+# def send_message_to_discord(channel_id, message, bot_token):
+#     nest_asyncio.apply()
+#     intents = discord.Intents.default()
+#     intents.message_content = True
+#     bot = discord.Client(intents=intents)
+#     async def send_message_and_exit():
+#         channel = bot.get_channel(channel_id)
+#         if channel is not None:
+#             await channel.send(message)
+#         else:
+#             print("Channel not found.")
+#         await bot.close()
+#     @bot.event
+#     async def on_ready():
+#         await send_message_and_exit()
+#         await bot.close()
+#     bot.run(bot_token)
+#     return 0

@@ -302,8 +302,8 @@ class STK_Simulation:
     def Create_Data_Comparison_df(self, Unplanned=True, Planned=True):
         data_comparison = {}
         if Unplanned:
-            data_comparison["Unplanned (%)"] = [len(np.unique(self.Holding_Data[self.Holding_Data['Target'].values==tar_num]['Bin Number'].values))/324*100 for tar_num in range(len(self.targets))]
-            data_comparison["Unplanned (Time)"] = [max(self.Holding_Data[self.Holding_Data['Target'].values==tar_num]['Time'].values)/86400 for tar_num in range(len(self.targets))]
+            data_comparison["Unplanned (%)"] = [np.count_nonzero(self.target_bins[tar_num])/324*100 for tar_num in range(len(self.targets))]
+            data_comparison["Unplanned (Time)"] = [np.max(self.target_times[tar_num])/86400 for tar_num in range(len(self.targets))]
         if Planned:
             data_comparison["Planned (%)"] = [len(np.unique(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Bin Number'].values))/324*100 for tar_num in range(len(self.targets))]
             data_comparison["Planned (Time)"] = [max(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Time'].values)/86400 for tar_num in range(len(self.targets))]
