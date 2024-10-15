@@ -2,17 +2,17 @@ import sys
 sys.path.append("../../")
 from STK_Sim import *
 
+n_pop = int(input('n_pop: '))
+n_gen = int(input('n_gen: '))
+n_sats = int(input('n_sats: '))
+duration = int(input('duration (days): '))
+optimize = input('Run new optimization? (T/F): ')
+
 Filename = 'AERO_402_Further_Assessment'
 
 print("Booting STK")
 stk_object = STK_Simulation(False,Filename)
 print("Loaded STK")
-
-n_pop = int(input('n_pop: '))
-n_gen = int(input('n_gen: '))
-n_sats = int(input('n_sats: '))
-duration = int(input('duration (days): '))
-optimize = input('Run new optimization? (T/F)')
 
 channel_id = 1203813613903675502
 bot_token=3
