@@ -118,8 +118,8 @@ class STK_Simulation:
                     access = tar.GetAccessToObject(sat)
                     access.ComputeAccess()
                     Intervals = access.DataProviders.GetItemByName('AER Data').Group.Item(0).ExecElements(self.root.CurrentScenario.StartTime,
-                                                                                                          self.root.CurrentScenario.StopTime,
-                                                                                                          self.dt,['Time','Azimuth','Elevation']).Intervals
+                                                                                                self.root.CurrentScenario.StopTime,
+                                                                                                self.dt,['Time','Azimuth','Elevation']).Intervals
                     for Int in Intervals:
                         times_az = Int.MultipleThresholdCrossings("Azimuth",az_range)
                         times_el = Int.MultipleThresholdCrossings("Elevation",el_range)
