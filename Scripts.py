@@ -17,9 +17,7 @@ from deap import tools
 from IPython.display import clear_output
 import scipy.interpolate as interpolate
 import time
-import discord
-import nest_asyncio
-import asyncio
+
 
 
 def time_convert(date):
@@ -292,21 +290,24 @@ def Generate_Performance_Curve(cost_curve_dicts, curve_type='Optimization', xaxi
     )
     fig.show()
 
-def send_message_to_discord(channel_id, message, bot_token):
-    nest_asyncio.apply()
-    intents = discord.Intents.default()
-    intents.message_content = True
-    bot = discord.Client(intents=intents)
-    async def send_message_and_exit():
-        channel = bot.get_channel(channel_id)
-        if channel is not None:
-            await channel.send(message)
-        else:
-            print("Channel not found.")
-        await bot.close()
-    @bot.event
-    async def on_ready():
-        await send_message_and_exit()
-        await bot.close()
-    bot.run(bot_token)
-    return 0
+def send_message_to_discord(message, channel_id = 1203813613903675502, bot_token='3'):
+    if len(bot_token) > 10:
+        import discord
+        import nest_asyncio
+        import asyncio
+        nest_asyncio.apply()
+        intents = discord.Intents.default()
+        intents.message_content = True
+        bot = discord.Client(intents=intents)
+        async def send_message_and_exit():
+            channel = bot.get_channel(channel_id)
+            if channel is not None:
+                await channel.send(message)
+            else:
+                print("Channel not found.")
+            await bot.close()
+        @bot.event
+        async def on_ready():
+            await send_message_and_exit()
+            await bot.close()
+        bot.run(bot_token)

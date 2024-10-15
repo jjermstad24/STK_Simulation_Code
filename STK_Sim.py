@@ -15,7 +15,7 @@ from alive_progress import alive_bar
 # from agi.stk12.stkobjects.aviator
 
 class STK_Simulation:
-    def __init__(self,GUI,Filename):
+    def __init__(self,GUI,Filename = 'AERO_402_Further_Assessment'):
         STKDesktop.ReleaseAll()
         if GUI == True:
             # Start new instance of STK with GUI
