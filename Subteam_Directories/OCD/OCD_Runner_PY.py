@@ -38,7 +38,7 @@ if optimize == 'T':
         pd.read_csv(f"../../Input_Files/Satellites_File_{n_sats}.txt").to_csv(f"../../Input_Files/Constellations/{n_sats}.txt",index=False)
     
 
-stk_object.Satellite_Loader(f"../../Input_Files/Satellites_File_{n_sats}.txt")
+stk_object.Satellite_Loader(f"../../Input_Files/Constellations/{n_sats}.txt")
 
 
 discord_message = [[f'Targets', 'Avg Unplanned %', 'Max Unplanned Time']]
