@@ -36,7 +36,7 @@ def Create_Poly(filename):
     return Polygon(l)
 
 def get_ind(n_sats):
-    df = pd.read_csv(f"../../Input_Files/Satellites_File_{n_sats}.txt")
+    df = pd.read_csv(f"../../Input_Files/Satellites_File.txt")
     return [df["Per"].values[0],df["Inc"].values[0],max(df["Asc"]),len(np.unique(df["Loc"]))]
 
 def plot_targets_and_polygon(poly,filename):
@@ -63,16 +63,18 @@ def plot_targets_and_polygon(poly,filename):
     return fig
 
 
-class Optimizer:
-    def __init__(self,stk_object,n_pop,n_gen,n_sats,weights = (7.0,-6.0,-1.0,-1.0)):
+class Optimizer2:
+    def __init__(self, stk_object, n_pop, n_gen, weights=(7.0,-1.0,-5.0)):
         self.stk_object = stk_object
         self.n_pop = n_pop
         self.n_gen = n_gen
-        self.n_sats = n_sats
         creator.create("FitnessMax", base.Fitness, weights=weights)
         creator.create("Satellite", list, fitness=creator.FitnessMax)
-        self.lower = [575,45,0,0,1]
-        self.upper = [630,135,180,50,self.n_sats]
+        self.lower = [575, 87, 30, 0, 3, 1]
+        self.upper = [630, 95, 150, 30, 12, 12]
+
+        # self.norm_array = np.array([100,self.stk_object.duration.total_seconds(),12,12])
+        self.norm_array = np.array([100,12,12])
 
         # Registering variables to the satellite
         self.toolbox = base.Toolbox()
@@ -80,39 +82,66 @@ class Optimizer:
         self.toolbox.register("attr_inc", random.randint, self.lower[1], self.upper[1])
         self.toolbox.register("attr_initial_raan", random.randint, self.lower[2], self.upper[2])
         self.toolbox.register("attr_delta_raan", random.randint, self.lower[3], self.upper[3])
-        self.toolbox.register("attr_num_planes", random.randint, self.lower[4], self.upper[4])
+        self.toolbox.register("attr_num_sats", random.randint, self.lower[4], self.upper[4])
+        self.toolbox.register("attr_num_planes", random.randint, self.lower[5], self.upper[5])
 
-        # Registering satellite to the model
-        self.toolbox.register("satellite", tools.initCycle, creator.Satellite,
-                        (self.toolbox.attr_alt,
-                        self.toolbox.attr_inc,
-                        self.toolbox.attr_initial_raan,
-                        self.toolbox.attr_delta_raan,
-                        self.toolbox.attr_num_planes), n=1)
+        def satellite_init():
+            # Normalized variables between 0 and 1
+            alt_norm = random.random()  # Normalized altitude
+            inc_norm = random.random()  # Normalized inclination
+            raan_norm = random.random()  # Normalized RAAN
+            delta_raan_norm = random.random()  # Normalized Delta RAAN
+            num_sats_norm = random.random()  # Normalized number of satellites
+            num_planes_norm = random.random()  # Normalized number of planes
+            
+            # Denormalize to original ranges
+            alt = int(alt_norm * (self.upper[0] - self.lower[0]) + self.lower[0])
+            inc = int(inc_norm * (self.upper[1] - self.lower[1]) + self.lower[1])
+            initial_raan = int(raan_norm * (self.upper[2] - self.lower[2]) + self.lower[2])
+            delta_raan = int(delta_raan_norm * (self.upper[3] - self.lower[3]) + self.lower[3])
+            num_sats = int(num_sats_norm * (self.upper[4] - self.lower[4]) + self.lower[4])
+            num_planes = min(int(num_planes_norm * (self.upper[5] - self.lower[5]) + self.lower[5]), num_sats)
+
+
+            return creator.Satellite([alt, inc, initial_raan, delta_raan, num_sats, num_planes])
+
+        self.toolbox.register("satellite", satellite_init)
 
         # Registering tools for the algorithm
+
+        def mutate_individual(mutant):
+            # Apply the registered mutation operator directly
+            tools.mutUniformInt(mutant, low=self.lower, up=self.upper, indpb=0.8)
+            
+            # Enforce the constraint after mutation
+            if mutant[4] < mutant[5]:  # if n_sats < n_planes
+                mutant[5] = mutant[4]  # Set n_planes = n_sats
+
+            return mutant
+        
         self.toolbox.register("population", tools.initRepeat, list, self.toolbox.satellite)
         self.toolbox.register("evaluate", self.cost_function)
-        self.toolbox.register("mate", tools.cxUniform,indpb=0.5)
-        self.toolbox.register("mutate", tools.mutUniformInt, low=self.lower,up=self.upper, indpb=0.5)
-        self.toolbox.register("select", tools.selTournament, tournsize=int(self.n_pop//2))
+        self.toolbox.register("mate", tools.cxUniform, indpb=0.5)
+        self.toolbox.register("mutate", mutate_individual)
+        self.toolbox.register("select", tools.selTournament, tournsize=int(self.n_pop // 2))
         self.stats = tools.Statistics(key=lambda ind: ind.fitness.values)
         self.stats.register("avg", np.mean, axis=0)
         self.stats.register("std", np.std, axis=0)
         self.stats.register("min", np.min, axis=0)
         self.stats.register("max", np.max, axis=0)
 
-    def run(self,read=False,enable_print=False,file=False):
+
+    def run(self,read=False,enable_print=False):
         self.enable_print = enable_print
         self.fits = []
         CXPB = 0.7;MUTPB=0.3
-        g = 0
+        self.g = 0
         # Creating a population to evolve
         pop = self.toolbox.population(n=self.n_pop)
         i = np.random.randint(0,self.n_pop)
         if read:
             for idx in range(4):
-                pop[i][idx] = get_ind(self.n_sats)[idx]
+                pop[i][idx] = get_ind(4)[idx]
 
         fitnesses = list(map(self.toolbox.evaluate, pop))
         for ind, fit in zip(pop, fitnesses):
@@ -124,22 +153,22 @@ class Optimizer:
         record = self.stats.compile(pop)
 
         clear_output(wait=False)
-        print("-- Generation %i --" % g)
+        print("-- Generation %i --" % self.g)
         print(pd.DataFrame(record))
-        
-        if file:
-            file.write("Gen,Pop,Alt,Inc,Initial_Raan,Delta_Raan,Num_Planes,Avg_Percentage,Std_Percentage,Avg_Time,Std_Time,\n")
+
+        with open(f"../../Pop_Over_Gen/pop_gen.csv","w") as file:
+            file.write("Gen,Pop,Alt,Inc,Initial_Raan,Delta_Raan,Num_Sats,Num_Planes,Avg_Percentage,Num_Sats,Num_Planes,\n")
             for i in range(self.n_pop):
-                file.write(f"{g},{i},")
-                for idx in range(5):
+                file.write(f"{self.g},{i},")
+                for idx in range(6):
                     file.write(f"{pop[i][idx]},")
-                for fit in pop[i].fitness.getValues():
+                for fit in pop[i].fitness.getValues()*self.norm_array:
                     file.write(f"{fit},")
                 file.write("\n")
         # Begin the evolution
-        while g < self.n_gen:
+        while self.g < self.n_gen:
             # clear_output(wait=True)
-            g = g + 1
+            self.g = self.g + 1
 
             # A new generation
             # Select the next generation individuals
@@ -157,7 +186,7 @@ class Optimizer:
                 if random.random() < MUTPB:
                     self.toolbox.mutate(mutant)
                     del mutant.fitness.values
-            # Evaluate the individuals with an invalid fitness
+
             invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
             fitnesses = map(self.toolbox.evaluate, invalid_ind)
 
@@ -170,40 +199,65 @@ class Optimizer:
             record = self.stats.compile(pop)
 
             clear_output(wait=False)
-            print("-- Generation %i --" % g)
+            print("-- Generation %i --" % self.g)
             print(pd.DataFrame(record))
             
-            if file:
+            with open(f"../../Pop_Over_Gen/pop_gen.csv","a") as file:
                 for i in range(self.n_pop):
-                    file.write(f"{g},{i},")
-                    for idx in range(5):
+                    file.write(f"{self.g},{i},")
+                    for idx in range(6):
                         file.write(f"{pop[i][idx]},")
-                    for fit in pop[i].fitness.getValues():
+                    for fit in pop[i].fitness.getValues()*self.norm_array:
                         file.write(f"{fit},")
                     file.write("\n")
         return hof
     
-    def cost_function(self,Individual=[0,0,0,0,0],write=True):
+    def cost_function(self,Individual=[0,0,0,0,0,0],write=True):
+        n_planes = Individual[5]
+        n_sats = Individual[4]
+
+        gen = self.g
+
         if write:
             self.Load_Individual(Individual)
-        self.stk_object.Satellite_Loader(f'../../Input_Files/Satellites_File_{self.n_sats}.txt')
+        self.stk_object.Satellite_Loader(f'../../Input_Files/Satellites_File.txt')
         self.stk_object.Compute_AzEl(self.enable_print)
-        percentages = np.array([100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))])
-        times = np.array([self.stk_object.target_times[idx]/86400 for idx in range(len(self.stk_object.targets))])
-        return np.average(percentages),np.std(percentages),np.average(times),np.std(times)
+        percentages = np.array([np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))])
+        times = np.array([self.stk_object.target_times[idx]/self.norm_array[1] for idx in range(len(self.stk_object.targets))])
+        
+        percentage = np.average(percentages)
+
+        penalty = 0
+        if n_planes > n_sats:
+            penalty = 100 * (n_planes - n_sats) 
+
+
+        if percentage < 1:
+            if gen >= 1:
+                percentage = s - (gen)/500
+        else:
+            percentage = 1
+
+        fitness = tuple([round(percentage,4), n_sats/12, n_planes/12 + penalty])
+
+        return tuple(fitness)
     
-    def Load_Individual(self,Individual=[0,0,0,0,0]):
+    def Load_Individual(self,Individual=[0,0,0,0,0,0]):
         Alt = Individual[0]
         Inc = Individual[1]
         initial_raan = Individual[2]
         delta_raan = Individual[3]
-        num_planes = int(Individual[4])
-        num_sats = self.n_sats
+        n_planes = int(Individual[5])
+        n_sats = int(Individual[4])
+        
+        if n_planes > n_sats:
+            n_planes = n_sats
+
         Asc = initial_raan
-        file = open(f"../../Input_Files/Satellites_File_{num_sats}.txt","w")
+        file = open(f"../../Input_Files/Satellites_File.txt","w")
         file.write("Per,Apo,Inc,Asc,Loc\n")
-        sats = num_sats*[1]
-        planes = np.array_split(sats,num_planes)
+        sats = n_sats*[1]
+        planes = np.array_split(sats,n_planes)
         i=1
         for plane in planes:
             Loc = 0
@@ -213,6 +267,7 @@ class Optimizer:
             if len(planes)>1:Asc -= i*((-1)**(i))*delta_raan
             i+=1
         file.close()
+
         
 def Interpolate(time,az,el):
     times = np.arange(time[0],time[-1],2.5)
@@ -290,7 +345,10 @@ def Generate_Performance_Curve(cost_curve_dicts, curve_type='Optimization', xaxi
     )
     fig.show()
 
-def send_message_to_discord(message, channel_id = 1203813613903675502, bot_token='3'):
+def send_message_to_discord(message, channel_id = 1203813613903675502):
+
+    bot_token='MTI5MjE4NjkxNDE5MDkxNzcyMg.GtL1SI.T3aRSzcSCGAFcTDPwZFhqd4xcjiIx0NnAn4ays'
+
     if len(bot_token) > 10:
         import discord
         import nest_asyncio

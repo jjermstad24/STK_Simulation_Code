@@ -289,8 +289,8 @@ class STK_Simulation:
     def set_sim_time(self,days=1, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0, weeks=0):
         self.root.UnitPreferences.SetCurrentUnit("DateFormat", "UTCG")
         start_time = time_convert(self.root.CurrentScenario.StartTime)
-        duration = datetime.timedelta(days=days, seconds=seconds, microseconds=microseconds, milliseconds=milliseconds, minutes=minutes, hours=hours, weeks=weeks)
-        stop_time=(start_time+duration).strftime("%d %b %Y %H:%M:%S.%f")
+        self.duration = datetime.timedelta(days=days, seconds=seconds, microseconds=microseconds, milliseconds=milliseconds, minutes=minutes, hours=hours, weeks=weeks)
+        stop_time=(start_time+self.duration).strftime("%d %b %Y %H:%M:%S.%f")
         self.root.CurrentScenario.StopTime=stop_time
         self.root.UnitPreferences.SetCurrentUnit("DateFormat", "EpSec")
 
