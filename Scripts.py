@@ -234,11 +234,11 @@ class Optimizer2:
 
         if percentage < 1:
             if gen >= 1:
-                percentage = s - (gen)/500
+                percentage = percentage - (gen)/500
         else:
             percentage = 1
 
-        fitness = tuple([round(percentage,4), n_sats/12, n_planes/12 + penalty])
+        fitness = tuple([round(percentage,4), (n_sats + n_planes)/24 + penalty])
 
         return tuple(fitness)
     
