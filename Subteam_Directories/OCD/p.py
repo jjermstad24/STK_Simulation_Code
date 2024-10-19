@@ -13,7 +13,7 @@ stk_object.set_sim_time(days = 10)
 stk_object.Target_Loader("../../Input_Files/Target_Packages/Targets_15.txt")
 
 class Optimizer:
-    def __init__(self, stk_object, n_pop, n_gen, run_num, weights=(7.0,-4.0)):
+    def __init__(self, stk_object, n_pop, n_gen, run_num,weights=(7.0,2.0,-4.0)):
         self.run_num = run_num
         self.weights = weights
         self.stk_object = stk_object
@@ -25,7 +25,7 @@ class Optimizer:
         self.upper = [630, 95, 150, 30, 12, 12]
 
         # self.norm_array = np.array([100,self.stk_object.duration.total_seconds(),12,12])
-        self.norm_array = np.array([100,24])
+        self.norm_array = np.array([100,self.stk_object.duration.total_seconds(),24])
 
         # Registering variables to the satellite
         self.toolbox = base.Toolbox()
@@ -112,11 +112,14 @@ class Optimizer:
         else:
             w = 'a'
         with open(f"../../Pop_Over_Gen/pop_gen.csv",f"{w}") as file:
-
             if self.run_num == 0:
-                file.write("Per_Weight,Cost_Weight,Gen,Pop,Alt,Inc,Initial_Raan,Delta_Raan,Num_Sats,Num_Planes,Avg_Percentage,Cost,\n")
+                file.write("Run_Num,Per_Weight,Time_Weight,Cost_Weight,Gen,Pop,Alt,Inc,Initial_Raan,Delta_Raan,Num_Sats,Num_Planes,Avg_Percentage,Max_Time,Cost,\n")
+            
             for i in range(self.n_pop):
-                file.write(f"{self.weights[0]},{self.weights[1]},{self.g},{i},")
+                file.write(f'{self.run_num},')
+                for weight in self.weights:
+                    file.write(f"{weight},")
+                file.write(f'{self.g},{i},')
                 for idx in range(6):
                     file.write(f"{pop[i][idx]},")
                 for fit in pop[i].fitness.getValues()*self.norm_array:
@@ -160,8 +163,12 @@ class Optimizer:
             print(pd.DataFrame(record))
             
             with open(f"../../Pop_Over_Gen/pop_gen.csv","a") as file:
+                
                 for i in range(self.n_pop):
-                    file.write(f"{self.weights[0]},{self.weights[1]},{self.g},{i},")
+                    file.write(f'{self.run_num},')
+                    for weight in self.weights:
+                        file.write(f"{weight},")
+                    file.write(f'{self.g},{i},')
                     for idx in range(6):
                         file.write(f"{pop[i][idx]},")
                     for fit in pop[i].fitness.getValues()*self.norm_array:
@@ -183,18 +190,18 @@ class Optimizer:
         times = np.array([self.stk_object.target_times[idx]/self.norm_array[1] for idx in range(len(self.stk_object.targets))])
         
         percentage = np.average(percentages)
+        max_time = np.max(times)
 
         penalty = 0
         if n_planes > n_sats:
-            penalty = 100 * (n_planes - n_sats) 
+            penalty = 10 * (n_planes - n_sats) 
 
-        # if percentage < .5/100:
-        #     if gen >= 1:
-        #         percentage = percentage - (gen)/500
-        # else:
-        #     percentage = .5/100
+        if percentage < 1:
+            # if gen >= 1:
+            #     percentage = percentage - (gen)/500
+            max_time = self.stk_object.duration
 
-        fitness = [percentage, (n_sats + n_planes)/24 + penalty]
+        fitness = [percentage, max_time/self.norm_array[1], (n_sats + n_planes)/24 + penalty]
 
         return tuple(fitness)
     
@@ -224,13 +231,14 @@ class Optimizer:
             i+=1
         file.close()
 
-weights = np.linspace(.01,.99,10)
-for run_num,weight in enumerate(weights[6:]):
-    per_weight = weight
-    cost_weight = 1-per_weight
-    opt = Optimizer(stk_object,n_pop=25,n_gen=10,run_num=run_num,weights=(per_weight, -cost_weight))
-    print("Beginning Optimization")
-    hof = opt.run(read=False,enable_print=False)
-    pd.DataFrame([hof[0]], columns = 'Alt,Inc,Init_RAAN,Delta_RAAN,N_sats,N_planes'.split(','))
 
+weights = np.linspace(.01,.25,5)
+for run_num,weight in enumerate(weights):
+    per_weight = .5
+    time_weight = weight
+    cost_weight = 1-time_weight-per_weight
+    opt = Optimizer(stk_object,n_pop=25,n_gen=10,run_num=run_num,weights=(per_weight,-time_weight,-cost_weight))
+    print("Beginning Optimization")
+    hof = opt.run(read=False,enable_print=True)
+    pd.DataFrame([hof[0]], columns = 'Alt,Inc,Init_RAAN,Delta_RAAN,N_sats,N_planes'.split(','))
 send_message_to_discord('Optimization Done')
