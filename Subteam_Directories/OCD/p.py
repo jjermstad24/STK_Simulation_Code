@@ -9,8 +9,8 @@ Filename = 'AERO_402_Further_Assessment'
 stk_object = STK_Simulation(False,Filename)
 
 
-stk_object.set_sim_time(days = 10)
-stk_object.Target_Loader("../../Input_Files/Target_Packages/Targets_15.txt")
+stk_object.set_sim_time(days = 15)
+stk_object.Target_Loader("../../Input_Files/Target_Packages/Targets_65.txt")
 
 class Optimizer:
     def __init__(self, stk_object, n_pop, n_gen, run_num,weights=(7.0,2.0,-4.0)):
@@ -23,8 +23,7 @@ class Optimizer:
         creator.create("Satellite", list, fitness=creator.FitnessMax)
         self.lower = [575, 87, 30, 0, 3, 1]
         self.upper = [630, 95, 150, 30, 12, 12]
-
-        # self.norm_array = np.array([100,self.stk_object.duration.total_seconds(),12,12])
+        
         self.norm_array = np.array([100,self.stk_object.duration.total_seconds(),24])
 
         # Registering variables to the satellite
@@ -232,13 +231,14 @@ class Optimizer:
         file.close()
 
 
-weights = np.linspace(.01,.25,5)
-for run_num,weight in enumerate(weights):
+weights = np.linspace(.01,.49,15)
+for run_num,weight in enumerate(weights[0:5]):
     per_weight = .5
     time_weight = weight
     cost_weight = 1-time_weight-per_weight
     opt = Optimizer(stk_object,n_pop=25,n_gen=10,run_num=run_num,weights=(per_weight,-time_weight,-cost_weight))
     print("Beginning Optimization")
-    hof = opt.run(read=False,enable_print=True)
+    hof = opt.run(read=False,enable_print=False)
     pd.DataFrame([hof[0]], columns = 'Alt,Inc,Init_RAAN,Delta_RAAN,N_sats,N_planes'.split(','))
+
 send_message_to_discord('Optimization Done')
