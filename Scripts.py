@@ -64,7 +64,7 @@ def plot_targets_and_polygon(poly,filename):
 
 
 class Optimizer2:
-    def __init__(self, stk_object, n_pop, n_gen, weights=(7.0,-1.0,-5.0)):
+    def __init__(self, stk_object, n_pop, n_gen, weights=(7.0,-4.0)):
         self.stk_object = stk_object
         self.n_pop = n_pop
         self.n_gen = n_gen
@@ -74,7 +74,7 @@ class Optimizer2:
         self.upper = [630, 95, 150, 30, 12, 12]
 
         # self.norm_array = np.array([100,self.stk_object.duration.total_seconds(),12,12])
-        self.norm_array = np.array([100,12,12])
+        self.norm_array = np.array([100,24])
 
         # Registering variables to the satellite
         self.toolbox = base.Toolbox()
@@ -157,7 +157,7 @@ class Optimizer2:
         print(pd.DataFrame(record))
 
         with open(f"../../Pop_Over_Gen/pop_gen.csv","w") as file:
-            file.write("Gen,Pop,Alt,Inc,Initial_Raan,Delta_Raan,Num_Sats,Num_Planes,Avg_Percentage,Num_Sats,Num_Planes,\n")
+            file.write("Gen,Pop,Alt,Inc,Initial_Raan,Delta_Raan,Num_Sats,Num_Planes,Avg_Percentage,Cost,\n")
             for i in range(self.n_pop):
                 file.write(f"{self.g},{i},")
                 for idx in range(6):
@@ -232,13 +232,10 @@ class Optimizer2:
             penalty = 100 * (n_planes - n_sats) 
 
 
-        if percentage < 1:
-            if gen >= 1:
-                percentage = percentage - (gen)/500
-        else:
-            percentage = 1
+        if gen >= 1:
+            percentage = percentage - (gen)/500
 
-        fitness = tuple([round(percentage,4), (n_sats + n_planes)/24 + penalty])
+        fitness = tuple([percentage, (n_sats + n_planes)/24 + penalty])
 
         return tuple(fitness)
     
@@ -262,7 +259,7 @@ class Optimizer2:
         for plane in planes:
             Loc = 0
             for sat in plane:
-                file.write(f"{Alt},{Alt},{Inc},{round(Asc%360,4)},{round(Loc,4)}\n")
+                file.write(f"{Alt},{Alt},{Inc},{round(Asc%180,4)},{round(Loc,4)}\n")
                 if len(plane)>1: Loc += 360/len(plane)
             if len(planes)>1:Asc -= i*((-1)**(i))*delta_raan
             i+=1
@@ -347,7 +344,7 @@ def Generate_Performance_Curve(cost_curve_dicts, curve_type='Optimization', xaxi
 
 def send_message_to_discord(message, channel_id = 1203813613903675502):
 
-    bot_token='MTI5MjE4NjkxNDE5MDkxNzcyMg.GtL1SI.T3aRSzcSCGAFcTDPwZFhqd4xcjiIx0NnAn4ays'
+    bot_token=3
 
     if len(bot_token) > 10:
         import discord

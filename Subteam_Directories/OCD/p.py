@@ -225,7 +225,7 @@ class Optimizer:
         file.close()
 
 weights = np.linspace(.01,.99,10)
-for run_num,weight in enumerate(weights):
+for run_num,weight in enumerate(weights[6:]):
     per_weight = weight
     cost_weight = 1-per_weight
     opt = Optimizer(stk_object,n_pop=25,n_gen=10,run_num=run_num,weights=(per_weight, -cost_weight))
