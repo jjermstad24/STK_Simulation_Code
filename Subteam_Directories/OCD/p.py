@@ -21,8 +21,8 @@ class Optimizer:
         self.n_gen = n_gen
         creator.create("FitnessMax", base.Fitness, weights=weights)
         creator.create("Satellite", list, fitness=creator.FitnessMax)
-        self.lower = [575, 87, 30, 0, 3, 1]
-        self.upper = [630, 95, 150, 30, 12, 12]
+        self.lower = [575, 80, 30, 0, 3, 1]
+        self.upper = [630, 100, 150, 30, 12, 12]
         
         self.norm_array = np.array([100,self.stk_object.duration.total_seconds(),24])
 
@@ -189,7 +189,7 @@ class Optimizer:
         times = np.array([self.stk_object.target_times[idx]/self.norm_array[1] for idx in range(len(self.stk_object.targets))])
         
         percentage = np.average(percentages)
-        max_time = np.max(times)
+        max_time = np.average(times)/self.norm_array[1]
 
         penalty = 0
         if n_planes > n_sats:
@@ -198,7 +198,7 @@ class Optimizer:
         if percentage < 1:
             # if gen >= 1:
             #     percentage = percentage - (gen)/500
-            max_time = self.stk_object.duration
+            max_time = self.norm_array[1]
 
         fitness = [percentage, max_time/self.norm_array[1], (n_sats + n_planes)/24 + penalty]
 
@@ -238,7 +238,7 @@ for run_num,weight in enumerate(weights[0:5]):
     cost_weight = 1-time_weight-per_weight
     opt = Optimizer(stk_object,n_pop=25,n_gen=10,run_num=run_num,weights=(per_weight,-time_weight,-cost_weight))
     print("Beginning Optimization")
-    hof = opt.run(read=False,enable_print=False)
+    hof = opt.run(read=False,enable_print=True)
     pd.DataFrame([hof[0]], columns = 'Alt,Inc,Init_RAAN,Delta_RAAN,N_sats,N_planes'.split(','))
 
 send_message_to_discord('Optimization Done')
