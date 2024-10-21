@@ -220,24 +220,12 @@ class Optimizer2:
 
         if write:
             self.Load_Individual(Individual)
-        self.stk_object.Satellite_Loader(f'../../Input_Files/Satellites_File.txt')
-        self.stk_object.Compute_AzEl(self.enable_print)
-        percentages = np.array([np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))])
-        times = np.array([self.stk_object.target_times[idx]/self.norm_array[1] for idx in range(len(self.stk_object.targets))])
-        
-        percentage = np.average(percentages)
-
-        penalty = 0
-        if n_planes > n_sats:
-            penalty = 100 * (n_planes - n_sats) 
-
-
-        if gen >= 1:
-            percentage = percentage - (gen)/500
-
-        fitness = tuple([percentage, (n_sats + n_planes)/24 + penalty])
-
-        return tuple(fitness)
+        self.stk_object.Satellite_Loader(f'../../Input_Files/Satellites_File_{self.n_sats}.txt')
+        self.stk_object.Results_Runner()
+        self.stk_object.Create_Data_Comparison_df(Unplanned=False)
+        percentages = self.stk_object.data_comparison['Planned (%)']
+        times = self.stk_object.data_comparison['Planned (Time)']
+        return np.average(percentages),np.std(percentages),np.average(times),np.std(times)
     
     def Load_Individual(self,Individual=[0,0,0,0,0,0]):
         Alt = Individual[0]
@@ -305,8 +293,19 @@ def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rat
     if len(bin_access_points)>0:
         for idx in range(len(bin_access_points)):
             previous_sat_accesses = satellite_specific_plan[int(bin_access_points[idx,3])]
-            window = [i for i, t in enumerate(previous_sat_accesses["Time"]) if abs(t - bin_access_points[idx,0]) <= time_threshold]
-            feasible = check_manueverability(np.array(previous_sat_accesses["Time"])[window],
+            times = previous_sat_accesses["Time"].copy()
+            if len(times) > 2:
+                times.append(bin_access_points[idx,0])
+                times.sort()
+                time_index = times.index(bin_access_points[idx,0])
+                if time_index == 0:
+                    window = [previous_sat_accesses["Time"].index(times[time_index+1])]
+                elif time_index == len(times)-1:
+                    window = [previous_sat_accesses["Time"].index(times[time_index-1])]
+                else:
+                    window = [previous_sat_accesses["Time"].index(times[time_index-1]),
+                              previous_sat_accesses["Time"].index(times[time_index+1])]
+                feasible = check_manueverability(np.array(previous_sat_accesses["Time"])[window],
                                              np.array(previous_sat_accesses["Cross Range"])[window],
                                              np.array(previous_sat_accesses["Along Range"])[window],
                                              bin_access_points[idx,0],
@@ -314,6 +313,16 @@ def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rat
                                              bin_access_points[idx,2],
                                              slew_rate,
                                              cone_angle)
+            else:
+                feasible = check_manueverability(np.array(previous_sat_accesses["Time"]),
+                                                np.array(previous_sat_accesses["Cross Range"]),
+                                                np.array(previous_sat_accesses["Along Range"]),
+                                                bin_access_points[idx,0],
+                                                bin_access_points[idx,1],
+                                                bin_access_points[idx,2],
+                                                slew_rate,
+                                                cone_angle)
+            
             if np.all(feasible):
                 return bin_access_points[idx]
     return False

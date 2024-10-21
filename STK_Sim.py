@@ -306,5 +306,5 @@ class STK_Simulation:
             data_comparison["Unplanned (Time)"] = [np.max(self.target_times[tar_num])/86400 for tar_num in range(len(self.targets))]
         if Planned:
             data_comparison["Planned (%)"] = [len(np.unique(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Bin Number'].values))/324*100 for tar_num in range(len(self.targets))]
-            data_comparison["Planned (Time)"] = [max(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Time'].values)/86400 for tar_num in range(len(self.targets))]
+            data_comparison["Planned (Time)"] = [max(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Time'].values/86400,default=None) for tar_num in range(len(self.targets))]
         self.data_comparison = pd.DataFrame(data_comparison)
