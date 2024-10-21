@@ -63,19 +63,21 @@ def plot_targets_and_polygon(poly,filename):
     return fig
 
 
-class Optimizer2:
-    def __init__(self, stk_object, n_pop, n_gen, weights=(7.0,-4.0)):
+class Optimizer:
+    def __init__(self, stk_object, n_pop, n_gen, run_num,weights=(.5,.25,.25)):
+        self.run_num = run_num
+        self.weights = weights
         self.stk_object = stk_object
         self.n_pop = n_pop
         self.n_gen = n_gen
         creator.create("FitnessMax", base.Fitness, weights=weights)
         creator.create("Satellite", list, fitness=creator.FitnessMax)
-        self.lower = [575, 87, 30, 0, 3, 1]
-        self.upper = [630, 95, 150, 30, 12, 12]
+        self.lower = [575, 80, 30, 0, 3, 1]
+        self.upper = [630, 100, 150, 30, 12, 12]
 
-        # self.norm_array = np.array([100,self.stk_object.duration.total_seconds(),12,12])
-        self.norm_array = np.array([100,24])
-
+        self.norm_array = np.array([100,self.stk_object.duration.total_seconds()/86400,24])
+        
+        
         # Registering variables to the satellite
         self.toolbox = base.Toolbox()
         self.toolbox.register("attr_alt", random.randint, self.lower[0], self.upper[0])
@@ -156,10 +158,19 @@ class Optimizer2:
         print("-- Generation %i --" % self.g)
         print(pd.DataFrame(record))
 
-        with open(f"../../Pop_Over_Gen/pop_gen.csv","w") as file:
-            file.write("Gen,Pop,Alt,Inc,Initial_Raan,Delta_Raan,Num_Sats,Num_Planes,Avg_Percentage,Cost,\n")
+        if self.run_num == 0:
+            w = 'w'
+        else:
+            w = 'a'
+        with open(f"../../Pop_Over_Gen/pop_gen.csv",f"{w}") as file:
+            if self.run_num == 0:
+                file.write(f"Run_Num,Per_Weight,Time_Weight,Cost_Weight,Gen,Pop,Alt,Inc,Initial_Raan,Delta_Raan,Num_Sats,Num_Planes,Avg_Percentage,Avg_Time,Cost,\n")
+            
             for i in range(self.n_pop):
-                file.write(f"{self.g},{i},")
+                file.write(f'{self.run_num},')
+                for weight in self.weights:
+                    file.write(f"{weight},")
+                file.write(f'{self.g},{i},')
                 for idx in range(6):
                     file.write(f"{pop[i][idx]},")
                 for fit in pop[i].fitness.getValues()*self.norm_array:
@@ -203,8 +214,12 @@ class Optimizer2:
             print(pd.DataFrame(record))
             
             with open(f"../../Pop_Over_Gen/pop_gen.csv","a") as file:
+                
                 for i in range(self.n_pop):
-                    file.write(f"{self.g},{i},")
+                    file.write(f'{self.run_num},')
+                    for weight in self.weights:
+                        file.write(f"{weight},")
+                    file.write(f'{self.g},{i},')
                     for idx in range(6):
                         file.write(f"{pop[i][idx]},")
                     for fit in pop[i].fitness.getValues()*self.norm_array:
@@ -220,12 +235,27 @@ class Optimizer2:
 
         if write:
             self.Load_Individual(Individual)
-        self.stk_object.Satellite_Loader(f'../../Input_Files/Satellites_File_{self.n_sats}.txt')
+        self.stk_object.Satellite_Loader(f'../../Input_Files/Satellites_File.txt')
         self.stk_object.Results_Runner()
         self.stk_object.Create_Data_Comparison_df(Unplanned=False)
         percentages = self.stk_object.data_comparison['Planned (%)']
         times = self.stk_object.data_comparison['Planned (Time)']
-        return np.average(percentages),np.std(percentages),np.average(times),np.std(times)
+
+        percentage = np.average(percentages)
+        time = np.average(times)
+
+        penalty = 0
+        if n_planes > n_sats:
+            penalty = 10 * (n_planes - n_sats) 
+
+        # if percentage < 1:
+        #     # if gen >= 1:
+        #     #     percentage = percentage - (gen)/500
+        #     time = self.stk_object.durtation.total_seconds()
+
+        objective = tuple(np.array([percentage, time, (n_sats + n_planes) + penalty])/self.norm_array)
+
+        return objective
     
     def Load_Individual(self,Individual=[0,0,0,0,0,0]):
         Alt = Individual[0]
