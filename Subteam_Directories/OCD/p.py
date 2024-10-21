@@ -9,7 +9,7 @@ Filename = 'AERO_402_Further_Assessment'
 stk_object = STK_Simulation(False,Filename)
 
 
-stk_object.set_sim_time(days=1)
+stk_object.set_sim_time(days=15)
 stk_object.Target_Loader("../../Input_Files/Target_Packages/Targets_65.txt")
 
 class Optimizer:
@@ -242,7 +242,7 @@ class Optimizer:
 
 
 weights = np.linspace(.01,.49,15)
-for run_num,weight in enumerate(weights[5:10]):
+for run_num,weight in enumerate(weights[0:3]):
     per_weight = .5
     time_weight = weight
     cost_weight = 1-time_weight-per_weight
@@ -251,7 +251,5 @@ for run_num,weight in enumerate(weights[5:10]):
     opt.run(read=False,enable_print=True)
     # hof = opt.run(read=False,enable_print=True)
     # pd.DataFrame([hof[0]], columns = 'Alt,Inc,Init_RAAN,Delta_RAAN,N_sats,N_planes'.split(','))
-
-send_message_to_discord('Optimization Done')
 
 send_message_to_discord('Optimization Done')

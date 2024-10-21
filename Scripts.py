@@ -344,7 +344,7 @@ def Generate_Performance_Curve(cost_curve_dicts, curve_type='Optimization', xaxi
 
 def send_message_to_discord(message, channel_id = 1203813613903675502):
 
-    bot_token=3
+    bot_token='MTI5MjE4NjkxNDE5MDkxNzcyMg.GQpP9E.3h92p2D3WQolvR5sZ9CPZVWGwqlY6gpBSA4gx8'
 
     if len(bot_token) > 10:
         import discord
