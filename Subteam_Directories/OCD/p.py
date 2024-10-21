@@ -24,16 +24,7 @@ class Optimizer:
         self.lower = [575, 80, 30, 0, 3, 1]
         self.upper = [630, 100, 150, 30, 12, 12]
 
-        
-        
-        if self.stk_object.duration.total_seconds() < 86400:
-            self.per_unit_time = 3600
-            self.time_unit = 'hours'
-        else:
-            self.per_unit_time = 86400
-            self.time_unit = 'days'
-
-        self.norm_array = np.array([100,self.stk_object.duration.total_seconds()/self.per_unit_time,24])
+        self.norm_array = np.array([100,self.stk_object.duration.total_seconds(),24])
         
         
         # Registering variables to the satellite
@@ -122,7 +113,7 @@ class Optimizer:
             w = 'a'
         with open(f"../../Pop_Over_Gen/pop_gen.csv",f"{w}") as file:
             if self.run_num == 0:
-                file.write(f"Run_Num,Per_Weight,Time_Weight,Cost_Weight,Gen,Pop,Alt,Inc,Initial_Raan,Delta_Raan,Num_Sats,Num_Planes,Avg_Percentage,Avg_Time [{self.time_unit}],Cost,\n")
+                file.write(f"Run_Num,Per_Weight,Time_Weight,Cost_Weight,Gen,Pop,Alt,Inc,Initial_Raan,Delta_Raan,Num_Sats,Num_Planes,Avg_Percentage,Avg_Time,Cost,\n")
             
             for i in range(self.n_pop):
                 file.write(f'{self.run_num},')
@@ -196,7 +187,7 @@ class Optimizer:
         self.stk_object.Satellite_Loader(f'../../Input_Files/Satellites_File.txt')
         self.stk_object.Compute_AzEl(self.enable_print)
         percentages = np.array([np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))])
-        times = np.array([self.stk_object.target_times[idx]/self.per_unit_time for idx in range(len(self.stk_object.targets))])
+        times = np.array([self.stk_object.target_times[idx] for idx in range(len(self.stk_object.targets))])
         
         percentage = np.average(percentages)
         avg_tme = np.average(times)
@@ -208,11 +199,9 @@ class Optimizer:
         if percentage < 1:
             # if gen >= 1:
             #     percentage = percentage - (gen)/500
-            avg_tme = self.norm_array[1]
+            avg_tme = self.stk_object.durtation.total_seconds()
 
-        fitness = [percentage, avg_tme/self.norm_array[1], (n_sats + n_planes)/24 + penalty]
-
-        return tuple(fitness)
+        return percentage, avg_tme/self.stk_object.durtation.total_seconds()/86400, (n_sats + n_planes)/24 + penalty
     
     def Load_Individual(self,Individual=[0,0,0,0,0,0]):
         Alt = Individual[0]
@@ -246,7 +235,7 @@ for run_num,weight in enumerate(weights[0:3]):
     per_weight = .5
     time_weight = weight
     cost_weight = 1-time_weight-per_weight
-    opt = Optimizer(stk_object,n_pop=50,n_gen=5,run_num=run_num,weights=(per_weight,-time_weight,-cost_weight))
+    opt = Optimizer(stk_object,n_pop=2,n_gen=1,run_num=run_num,weights=(per_weight,-time_weight,-cost_weight))
     print("Beginning Optimization")
     opt.run(read=False,enable_print=True)
     # hof = opt.run(read=False,enable_print=True)
