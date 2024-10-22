@@ -302,60 +302,43 @@ def check_manueverability(previous_times,
                           new_along_range,
                           slew_rate,
                           cone_angle):
+    d_theta_2 = np.hypot(new_crossrange, new_along_range) - cone_angle
+    d_theta_2 = max(d_theta_2, 0)  # Clamp to 0 if negative
 
-    d_theta_2 = (new_crossrange**2+new_along_range**2)**0.5-cone_angle
-    if d_theta_2 < 0:
-        d_theta_2 = 0
+    if len(previous_times) > 0:
+        # Compute d_theta_1 for the previous points
+        d_theta_1 = np.hypot(previous_crossrange, previous_alongrange) - cone_angle
+        np.maximum(d_theta_1, 0, out=d_theta_1)  # Clamp values in-place
 
-    if len(previous_times)>0:
-        d_theta_1 = (previous_crossrange**2+previous_alongrange**2)**0.5-cone_angle
-        d_theta_1[d_theta_1<0] = 0
+        # Calculate time differences
+        d_time = np.abs(new_time - previous_times)
 
-        d_time = np.abs(new_time-previous_times)
+        # Return maneuverability condition, ensuring no division by zero
+        ratio = np.divide(d_theta_1 + d_theta_2, d_time,
+                          out=np.full_like(d_time, 10),
+                          where=d_time != 0)
+        
+        return ratio <= slew_rate
 
-        return np.divide(d_theta_1+d_theta_2,d_time,out=1.1*slew_rate*np.ones_like(d_time),where=d_time!=0)<=slew_rate
-    elif (slew_rate==0 and d_theta_2==0) or (slew_rate>0):
-        return [[True]]
-    else:
-        return [[False]]
+    # Simplified handling for edge cases when there are no previous times
+    return [[slew_rate > 0 or (slew_rate == 0 and d_theta_2 == 0)]]
 
-def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rate,cone_angle,time_threshold):
+def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rate,cone_angle,time_threshold=60):
     if len(bin_access_points)>0:
-        for idx in range(len(bin_access_points)):
-            previous_sat_accesses = satellite_specific_plan[int(bin_access_points[idx,3])]
-            times = previous_sat_accesses["Time"].copy()
-            if len(times) > 2:
-                times.append(bin_access_points[idx,0])
-                times.sort()
-                time_index = times.index(bin_access_points[idx,0])
-                if time_index == 0:
-                    window = [previous_sat_accesses["Time"].index(times[time_index+1])]
-                elif time_index == len(times)-1:
-                    window = [previous_sat_accesses["Time"].index(times[time_index-1])]
-                else:
-                    window = [previous_sat_accesses["Time"].index(times[time_index-1]),
-                              previous_sat_accesses["Time"].index(times[time_index+1])]
-                feasible = check_manueverability(np.array(previous_sat_accesses["Time"])[window],
-                                             np.array(previous_sat_accesses["Cross Range"])[window],
-                                             np.array(previous_sat_accesses["Along Range"])[window],
-                                             bin_access_points[idx,0],
-                                             bin_access_points[idx,1],
-                                             bin_access_points[idx,2],
+        for point in bin_access_points:
+            previous_sat_accesses = satellite_specific_plan[int(point[3])]
+            feasible = check_manueverability(np.array(previous_sat_accesses["Time"]),
+                                             np.array(previous_sat_accesses["Cross Range"]),
+                                             np.array(previous_sat_accesses["Along Range"]),
+                                             point[0],
+                                             point[1],
+                                             point[2],
                                              slew_rate,
                                              cone_angle)
-            else:
-                feasible = check_manueverability(np.array(previous_sat_accesses["Time"]),
-                                                np.array(previous_sat_accesses["Cross Range"]),
-                                                np.array(previous_sat_accesses["Along Range"]),
-                                                bin_access_points[idx,0],
-                                                bin_access_points[idx,1],
-                                                bin_access_points[idx,2],
-                                                slew_rate,
-                                                cone_angle)
             
             if np.all(feasible):
-                return bin_access_points[idx]
-    return False
+                return point
+        return False
 
 def Generate_Performance_Curve(cost_curve_dicts, curve_type='Optimization', xaxis='Number of Targets', yaxis='Avg_time'):
     
