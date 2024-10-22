@@ -190,35 +190,26 @@ class STK_Simulation:
             sat.MassProperties.Inertia.Iyz = I[2][0]
             sat.MassProperties.Inertia.Izz = I[2][2]
 
-    def Generate_Pre_Planning_Data(self,enable_print=True):
+    def Generate_Pre_Planning_Data(self):
         self.root.ExecuteCommand("ClearAllAccess /")
         az_range = list(range(0,360,10))
         el_range = list(range(0,90,10))
 
         self.Reset_Target_Bins()
 
-        num_targets = len(self.targets)
-        num_sats = len(self.satellites)
-
-        tar_to_sat = {}
-        sat_to_tar = {}
-
-        with alive_bar(num_targets*num_sats,force_tty=True,bar='classic',title='- Computing_Access',length=10,disable=not(enable_print)) as bar:
+        with alive_bar(len(self.targets)*len(self.satellites),force_tty=True,bar='classic',title='- Computing_Access',length=10) as bar:
             for sat_num,sat in enumerate(self.satellites):
                 for tar_num,tar in enumerate(self.targets):
-                    tar_to_sat[f"{tar_num}-{sat_num}"] = (tar.GetAccessToObject(sat))
-                    tar_to_sat[f"{tar_num}-{sat_num}"].ComputeAccess()
-                    
-                    sat_to_tar[f"{sat_num}-{tar_num}"] = sat.GetAccessToObject(tar)
-                    sat_to_tar[f"{sat_num}-{tar_num}"].ComputeAccess()
+                    tar.GetAccessToObject(sat).ComputeAccess()
+                    sat.GetAccessToObject(tar).ComputeAccess()
                     bar()
 
-        self.Pre_Planning_Hash_Map = {idx:{bin_num:[] for bin_num in range(324)} for idx in range(num_targets)}
+        self.Pre_Planning_Hash_Map = {idx:{bin_num:[] for bin_num in range(324)} for idx in range(len(self.targets))}
 
-        with alive_bar(num_targets*num_sats,force_tty=True,bar='classic',title='- Getting_AzEl',length=10,disable=not(enable_print)) as bar:
+        with alive_bar(len(self.targets)*len(self.satellites),force_tty=True,bar='classic',title='- Getting_AzEl',length=10) as bar:
             for sat_num,sat in enumerate(self.satellites):
                 for tar_num,tar in enumerate(self.targets):
-                    access = tar_to_sat[f"{tar_num}-{sat_num}"]
+                    access = tar.GetAccessToObject(sat)
                     Intervals = access.DataProviders.GetItemByName('AER Data').Group.Item(0).ExecElements(self.root.CurrentScenario.StartTime,
                                                                                                 self.root.CurrentScenario.StopTime,
                                                                                                 self.dt,['Time','Azimuth','Elevation']).Intervals
@@ -234,33 +225,33 @@ class STK_Simulation:
                                         if (any(t[0] <= value <= t[1] for value in t_az[0]) or 
                                             any(t_az[0][0] <= value <= t_az[0][1] for value in t)):
                                             self.Update_Target_Bins(t_az[0][0],i*9+j,tar_num)
-                                            time_range = np.arange(t_az[0][0],t_az[0][1],self.dt).tolist()
-                                            time_range.append(t_az[0][1])
+                                            time_range = [float(i) for i in np.append(np.arange(t_az[0][0],t_az[0][1],self.dt),t_az[0][1])]
                                             times.extend(time_range)
                                             bins.extend(len(time_range)*[i*9+j])
                                             
-                    access = sat_to_tar[f"{sat_num}-{tar_num}"]
+                    access = sat.GetAccessToObject(tar)
                     res = access.DataProviders.GetItemByName('Sat Angles Data').ExecSingleElementsArray(times,['Cross Track','Along Track'])
                     crosstrack = res.GetArray(0)
                     alongtrack = res.GetArray(1)
                     for b,t,ct,at in zip(bins,times,crosstrack,alongtrack):
                         self.Pre_Planning_Hash_Map[tar_num][b].append([t,ct,at,sat_num])
+                    
                     bar()
                     
-        with alive_bar(num_targets*324,force_tty=True,bar='classic',title='- Sorting_Data',length=10,disable=not(enable_print)) as bar:
-            for tar_num in range(num_targets):
+        with alive_bar(len(self.targets)*324,force_tty=True,bar='classic',title='- Sorting_Data',length=10) as bar:
+            for tar_num in range(len(self.targets)):
                 for bin_num in range(324):
                     a = np.array(self.Pre_Planning_Hash_Map[tar_num][bin_num],dtype=float)
                     if len(a) > 0:
                         self.Pre_Planning_Hash_Map[tar_num][bin_num] = a[a[:,0].argsort()]
                     bar()
-            
-            return 0
         
-    def Plan(self,slew_rate,cone_angle,time_threshold=6000,enable_print=True):
+        return 0
+        
+    def Plan(self,slew_rate,cone_angle,time_threshold=6000):
         satellite_specific_plan = {key:{"Time":[],"Target":[],"Bin Number":[],"Cross Range":[],"Along Range":[]} for key in range(len(self.satellites))}
         bins = np.reshape([[[count,tar_num,bin_num] for bin_num,count in enumerate(tar_bin.ravel())] for tar_num,tar_bin in enumerate(self.target_bins)],[len(self.targets)*324,3]).astype(int)
-        with alive_bar(324*len(self.targets),force_tty=True,bar='classic',title=f'- Planning',length=10,disable=not(enable_print)) as bar:
+        with alive_bar(324*len(self.targets),force_tty=True,bar='classic',title=f'- Planning',length=10) as bar:
             for count,tar_num,bin_num in bins[bins[:,0].argsort()]:
                 if count > 0:
                     result = get_best_available_access(satellite_specific_plan,self.Pre_Planning_Hash_Map[tar_num][bin_num],slew_rate,cone_angle,time_threshold)
@@ -303,10 +294,10 @@ class STK_Simulation:
         self.root.CurrentScenario.StopTime=stop_time
         self.root.UnitPreferences.SetCurrentUnit("DateFormat", "EpSec")
 
-    def Results_Runner(self, Plan=True, enable_print=True):
-        self.Generate_Pre_Planning_Data(enable_print=enable_print)
+    def Results_Runner(self, Plan=True):
+        self.Generate_Pre_Planning_Data()
         if Plan:
-            self.Plan(1,20,enable_print=enable_print)
+            self.Plan(1,20)
 
     def Create_Data_Comparison_df(self, Unplanned=True, Planned=True):
         data_comparison = {}
