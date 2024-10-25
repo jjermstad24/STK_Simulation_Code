@@ -246,6 +246,9 @@ class MultiObjectiveOptimizer:
             tools.mutUniformInt(mutant, low=self.lower, up=self.upper, indpb=0.8)
             if mutant[4] < mutant[5]:  # Ensure num_planes <= num_sats
                 mutant[5] = mutant[4]
+
+            # elif mutant[4]//3 > mutant[5]:
+            #     mutant[5] == mutant[4]%3
             return mutant
 
         # Register evaluate as a method of the class
@@ -366,23 +369,31 @@ class MultiObjectiveOptimizer:
 
             penalty = 0
             if n_planes > n_sats:
-                penalty = 500000000
+                penalty = 1000000000000
             cost = cost + penalty
 
         else:
             print('OLD RUN USED!!!')
-            percentage = old_run['Avg_Percentage']
-            time = old_run['Avg_Time']
-            cost = old_run['Cost']
+            percentage = old_run['Avg_Percentage'].iloc[0]
+            time = old_run['Avg_Time'].iloc[0]
+            cost = old_run['Cost'].iloc[0]
 
         return tuple(np.array([percentage,time,cost])/self.norm_array)
     
     def prog_cost_function(self, Individual):
+        cost_df = self.cost_df  
+
+        cost_per_launch = 62000000
+
         n_planes = Individual[5]
         n_sats = Individual[4]
-        cost_df = self.cost_df
-        per_sat = (cost_df['Per Satellite']*n_sats).sum()
-        total_cost = cost_df['Set Cost'].sum() + per_sat
+
+        operations_cost = 132565233
+        first_sat_cost = cost_df['First_Sat_Cost'].sum()
+        additional_sats_cost = (cost_df['Add_Sat_Cost']*(n_sats-1)).sum()
+        launch_costs = cost_per_launch*n_planes
+        
+        total_cost = operations_cost +  first_sat_cost + additional_sats_cost + launch_costs
         return total_cost
     
     def write_population_to_csv(self, pop, write_type, output_file):
