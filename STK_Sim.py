@@ -192,15 +192,11 @@ class STK_Simulation:
 
     def Generate_Pre_Planning_Data(self, enable_print=True):
         self.root.ExecuteCommand("ClearAllAccess /")
+        sort = True
         az_range = list(range(0,360,10))
         el_range = list(range(0,90,10))
 
         self.Reset_Target_Bins()
-
-    def Generate_Pre_Planning_Data(self,enable_print=True):
-
-        az_range = list(range(0,360,10))
-        el_range = list(range(0,90,10))
         with alive_bar(len(self.targets)*len(self.satellites),force_tty=True,bar='classic',title='- Computing_Access',length=10,disable=not(enable_print)) as bar:
             for sat_num,sat in enumerate(self.satellites):
                 for tar_num,tar in enumerate(self.targets):
@@ -211,8 +207,8 @@ class STK_Simulation:
         self.Pre_Planning_Hash_Map = {idx:{bin_num:[] for bin_num in range(324)} for idx in range(len(self.targets))}
 
         with alive_bar(len(self.targets)*len(self.satellites),force_tty=True,bar='classic',title='- Getting_AzEl',length=10,disable=not(enable_print)) as bar:
-            for sat_num,sat in enumerate(self.satellites):
-                for tar_num,tar in enumerate(self.targets):
+            for tar_num,tar in enumerate(self.targets):
+                for sat_num,sat in enumerate(self.satellites):
                     access = tar.GetAccessToObject(sat)
                     Intervals = access.DataProviders.GetItemByName('AER Data').Group.Item(0).ExecElements(self.root.CurrentScenario.StartTime,
                                                                                                 self.root.CurrentScenario.StopTime,
@@ -239,16 +235,22 @@ class STK_Simulation:
                     alongtrack = res.GetArray(1)
                     for b,t,ct,at in zip(bins,times,crosstrack,alongtrack):
                         self.Pre_Planning_Hash_Map[tar_num][b].append([t,ct,at,sat_num])
-                    
                     bar()
-                    
-        with alive_bar(len(self.targets)*324,force_tty=True,bar='classic',title='- Sorting_Data',length=10,disable=not(enable_print)) as bar:
-            for tar_num in range(len(self.targets)):
-                for bin_num in range(324):
-                    a = np.array(self.Pre_Planning_Hash_Map[tar_num][bin_num],dtype=float)
-                    if len(a) > 0:
-                        self.Pre_Planning_Hash_Map[tar_num][bin_num] = a[a[:,0].argsort()]
-                    bar()
+                
+                if self.opt and (np.count_nonzero(self.target_bins[tar_num])/324 != 1):
+                    sort = False
+                    break
+
+
+        
+        if sort:
+            with alive_bar(len(self.targets)*324,force_tty=True,bar='classic',title='- Sorting_Data',length=10,disable=not(enable_print)) as bar:
+                for tar_num in range(len(self.targets)):
+                    for bin_num in range(324):
+                        a = np.array(self.Pre_Planning_Hash_Map[tar_num][bin_num],dtype=float)
+                        if len(a) > 0:
+                            self.Pre_Planning_Hash_Map[tar_num][bin_num] = a[a[:,0].argsort()]
+                        bar()
         
         return 0
         
@@ -298,17 +300,28 @@ class STK_Simulation:
         self.root.CurrentScenario.StopTime=stop_time
         self.root.UnitPreferences.SetCurrentUnit("DateFormat", "EpSec")
 
-    def Results_Runner(self, Plan=True, enable_print=True):
+    def Results_Runner(self, Plan=True, opt=False, enable_print=True):
+        self.opt = opt
         self.Generate_Pre_Planning_Data(enable_print=enable_print)
         if Plan:
-            self.Plan(1,20,enable_print=enable_print)
+            percentage = np.average([np.count_nonzero(self.target_bins[tar_num])/324*100 for tar_num in range(len(self.targets))])
+
+            if percentage == 100:
+                self.Plan(1,20,enable_print=enable_print)
+                self.hundred = True
+            else:
+                self.hundred = False
 
     def Create_Data_Comparison_df(self, Unplanned=True, Planned=True,enable_print=True):
         data_comparison = {}
         if Unplanned:
             data_comparison["Unplanned (%)"] = [np.count_nonzero(self.target_bins[tar_num])/324*100 for tar_num in range(len(self.targets))]
             data_comparison["Unplanned (Time)"] = [np.max(self.target_times[tar_num])/86400 for tar_num in range(len(self.targets))]
-        if Planned:
+        if Planned and self.hundred:
             data_comparison["Planned (%)"] = [len(np.unique(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Bin Number'].values))/324*100 for tar_num in range(len(self.targets))]
-            data_comparison["Planned (Time)"] = [max(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Time'].values/86400,default=None) for tar_num in range(len(self.targets))]
+            data_comparison["Planned (Time)"] = [np.average(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Time'].values/86400,default=None) for tar_num in range(len(self.targets))]
+        if not(self.hundred):
+            data_comparison["Planned (%)"] = [np.count_nonzero(self.target_bins[tar_num])/324*100 for tar_num in range(len(self.targets))]
+            data_comparison["Planned (Time)"] = [np.max(self.target_times[tar_num])/86400 for tar_num in range(len(self.targets))]
+        
         self.data_comparison = pd.DataFrame(data_comparison)

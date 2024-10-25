@@ -173,7 +173,7 @@ class Optimizer:
         if write:
             Load_Individual(Individual)
         self.stk_object.Satellite_Loader(f'../../Input_Files/Satellites_File.txt')
-        self.stk_object.Results_Runner()
+        self.stk_object.Results_Runner(opt=True)
         self.stk_object.Create_Data_Comparison_df(Unplanned=False)
         percentages = self.stk_object.data_comparison['Planned (%)']
         times = self.stk_object.data_comparison['Planned (Time)']
@@ -356,7 +356,7 @@ class MultiObjectiveOptimizer:
             if write:
                 Load_Individual(Individual)
             self.stk_object.Satellite_Loader(f'../../Input_Files/Satellites_File.txt')
-            self.stk_object.Results_Runner(enable_print=self.enable_print)
+            self.stk_object.Results_Runner(enable_print=self.enable_print,opt=True)
             self.stk_object.Create_Data_Comparison_df(Unplanned=False)
             percentage = np.average(self.stk_object.data_comparison['Planned (%)'])
             times = self.stk_object.data_comparison['Planned (Time)']
