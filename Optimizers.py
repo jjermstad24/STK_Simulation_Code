@@ -275,10 +275,12 @@ class MultiObjectiveOptimizer:
             # Creating a population to evolve
             pop = list(self.toolbox.population(n=self.n_pop))  # Ensure this is a list
 
-            i = np.random.randint(0, self.n_pop)
             if read:
-                for idx in range(4):
-                    pop[i][idx] = get_ind(4)[idx]
+                for n_sats in range(3,13):
+                    i = np.random.randint(0,self.n_pop)
+                    for idx in range(4):
+                        pop[i][idx] = get_ind(n_sats)[idx]
+
 
             fitnesses = list(map(lambda ind: self.toolbox.evaluate(ind), pop))
             for ind, fit in zip(pop, fitnesses):
@@ -346,7 +348,7 @@ class MultiObjectiveOptimizer:
             gc.collect()
             return hof
 
-    def objective_function(self, Individual=[0, 0, 0, 0, 0, 0], write=True):
+    def objective_function(self, Individual=[0,0,0,0,0,0], write=True):
         n_planes = Individual[5]
         n_sats = Individual[4]
 
@@ -368,8 +370,9 @@ class MultiObjectiveOptimizer:
                 time = np.average(times)
 
             penalty = 0
+            
             if n_planes > n_sats:
-                penalty = 1000000000000
+                penalty = 5000000
             cost = cost + penalty
 
         else:
