@@ -203,7 +203,7 @@ class MultiObjectiveOptimizer:
         self.n_gen = n_gen
         creator.create("FitnessMulti", base.Fitness, weights=(1.0, -1.0, -1.0))
         creator.create("Satellite", list, fitness=creator.FitnessMulti)
-        self.lower = [575, 80, 30, 0, 3, 1]
+        self.lower = [575, 80, 30, 0, 3, 3]
         self.upper = [630, 100, 150, 30, 12, 12]
         self.norm_array = np.array([100, self.stk_object.duration.total_seconds() / 86400, self.prog_cost_function([0,0,0,0,12,12])])
 
@@ -386,7 +386,7 @@ class MultiObjectiveOptimizer:
     def prog_cost_function(self, Individual):
         cost_df = self.cost_df  
 
-        cost_per_launch = 62000000
+        cost_per_launch = 12000000
 
         n_planes = Individual[5]
         n_sats = Individual[4]
