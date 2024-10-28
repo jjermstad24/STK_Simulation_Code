@@ -35,7 +35,8 @@ def Create_Poly(filename):
 
 def get_ind(n_sats):
     df = pd.read_csv(f"../../Input_Files/Constellations/{n_sats}.txt")
-    return [df["Per"].values[0],df["Inc"].values[0],df["Asc"].iloc[n_sats//2],len(np.unique(df["Loc"]))]
+    asc = np.unique(df['Asc'])
+    return [df["Per"].values[0],df["Inc"].values[0],asc[0],abs(asc[1]-asc[0]),len(df),len(asc)]
 
 def plot_targets_and_polygon(poly,filename):
     df = pd.read_csv(filename)

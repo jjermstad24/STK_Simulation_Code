@@ -197,12 +197,6 @@ class STK_Simulation:
         el_range = list(range(0,90,10))
 
         self.Reset_Target_Bins()
-        with alive_bar(len(self.targets)*len(self.satellites),force_tty=True,bar='classic',title='- Computing_Access',length=10,disable=not(enable_print)) as bar:
-            for sat_num,sat in enumerate(self.satellites):
-                for tar_num,tar in enumerate(self.targets):
-                    tar.GetAccessToObject(sat).ComputeAccess()
-                    sat.GetAccessToObject(tar).ComputeAccess()
-                    bar()
 
         self.Pre_Planning_Hash_Map = {idx:{bin_num:[] for bin_num in range(324)} for idx in range(len(self.targets))}
 
@@ -210,6 +204,7 @@ class STK_Simulation:
             for tar_num,tar in enumerate(self.targets):
                 for sat_num,sat in enumerate(self.satellites):
                     access = tar.GetAccessToObject(sat)
+                    access.ComputeAccess()
                     Intervals = access.DataProviders.GetItemByName('AER Data').Group.Item(0).ExecElements(self.root.CurrentScenario.StartTime,
                                                                                                 self.root.CurrentScenario.StopTime,
                                                                                                 self.dt,['Time','Azimuth','Elevation']).Intervals
@@ -230,14 +225,14 @@ class STK_Simulation:
                                             bins.extend(len(time_range)*[i*9+j])
                                             
                     access = sat.GetAccessToObject(tar)
+                    access.ComputeAccess()
                     res = access.DataProviders.GetItemByName('Sat Angles Data').ExecSingleElementsArray(times,['Cross Track','Along Track'])
                     crosstrack = res.GetArray(0)
                     alongtrack = res.GetArray(1)
                     for b,t,ct,at in zip(bins,times,crosstrack,alongtrack):
                         self.Pre_Planning_Hash_Map[tar_num][b].append([t,ct,at,sat_num])
-                    bar()
-                
-                if self.opt and (np.count_nonzero(self.target_bins[tar_num])/324 != 1):
+                    bar()                
+                if self.opt and (np.count_nonzero(self.target_bins[tar_num])/324 < 1.0):
                     sort = False
                     break
 
@@ -319,7 +314,7 @@ class STK_Simulation:
             data_comparison["Unplanned (Time)"] = [np.max(self.target_times[tar_num])/86400 for tar_num in range(len(self.targets))]
         if Planned and self.hundred:
             data_comparison["Planned (%)"] = [len(np.unique(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Bin Number'].values))/324*100 for tar_num in range(len(self.targets))]
-            data_comparison["Planned (Time)"] = [np.average(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Time'].values/86400,default=self.duaration.total_seconds()/86400) for tar_num in range(len(self.targets))]
+            data_comparison["Planned (Time)"] = [np.average(self.Planned_Data[self.Planned_Data['Target'].values==tar_num]['Time'].values/86400) for tar_num in range(len(self.targets))]
         if not(self.hundred):
             data_comparison["Planned (%)"] = [np.count_nonzero(self.target_bins[tar_num])/324*100 for tar_num in range(len(self.targets))]
             data_comparison["Planned (Time)"] = [np.max(self.target_times[tar_num])/86400 for tar_num in range(len(self.targets))]

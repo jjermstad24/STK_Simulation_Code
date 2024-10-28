@@ -364,7 +364,7 @@ class MultiObjectiveOptimizer:
             times = self.stk_object.data_comparison['Planned (Time)']
             cost = self.prog_cost_function(Individual)
 
-            if times.isnull().any() or percentage != 1:
+            if times.isnull().any() or percentage < 100:
                 time = self.stk_object.duration.total_seconds() / 86400
             else:
                 time = np.average(times)
