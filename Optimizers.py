@@ -365,6 +365,7 @@ class MultiObjectiveOptimizer:
             cost = self.prog_cost_function(Individual)
 
             if times.isnull().any() or percentage < 100:
+                percentage = 0
                 time = self.stk_object.duration.total_seconds() / 86400
             else:
                 time = np.average(times)
@@ -372,7 +373,7 @@ class MultiObjectiveOptimizer:
             penalty = 0
             
             if n_planes > n_sats:
-                penalty = 5000000
+                penalty = 3000000000
             cost = cost + penalty
 
         else:
