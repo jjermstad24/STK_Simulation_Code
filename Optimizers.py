@@ -276,10 +276,9 @@ class MultiObjectiveOptimizer:
             pop = list(self.toolbox.population(n=self.n_pop))  # Ensure this is a list
 
             if read:
-                for n_sats in range(3,13):
-                    i = np.random.randint(0,self.n_pop)
-                    for idx in range(4):
-                        pop[i][idx] = get_ind(n_sats)[idx]
+                i = np.random.randint(0,self.n_pop)
+                for idx in range(4):
+                    pop[i][idx] = get_ind(self.upper[5])[idx]
 
 
             fitnesses = list(map(lambda ind: self.toolbox.evaluate(ind), pop))
