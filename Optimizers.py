@@ -73,8 +73,9 @@ class MultiObjectiveOptimizer:
 
             if read:
                 i = np.random.randint(0,self.n_pop)
-                for idx in range(len(self.upper)):
-                    pop[i][idx] = get_ind(self.upper[5])[idx]
+                if get_ind(self.upper[5]) != 0:
+                    for idx in range(len(self.upper)):
+                        pop[i][idx] = get_ind(self.upper[5])[idx]
                 
 
 
