@@ -203,7 +203,7 @@ def create_pareto(df,objective1='Cost',obj1_type=-1, objective2='Avg_Percentage'
         fig = make_subplots()
 
         scatter = go.Scatter(x=df[objective1],y=df[objective2],hovertext=df.apply(lambda row: '<br>'.join([f'{col}: {row[col]}' for col in df.columns]), axis=1),
-                            hoverinfo='text',mode='markers',name='Data Points',marker=dict(size=8))
+                            hoverinfo='text',mode='markers',name='Dominated Designs',marker=dict(size=8))
     
         pareto_line = go.Scatter(x=pareto_frontier[objective1],y=pareto_frontier[objective2],hovertext=pareto_frontier.apply(lambda row: '<br>'.join([f'{col}: {row[col]}' for col in pareto_frontier.columns]), axis=1),
             hoverinfo='text',mode='lines+markers',name='Pareto Frontier',line=dict(color='green'),marker=dict(size=8))
@@ -214,118 +214,6 @@ def create_pareto(df,objective1='Cost',obj1_type=-1, objective2='Avg_Percentage'
         fig.show()
 
     return pareto_frontier
-
-def pop_over_gen_animator(pop_over_gen_df,plot_title='Pop_Over_Gen', objective1='Cost', obj1_type=1,objective2='Avg_Percentage', obj2_type=1,constraint=False, 
-                                  xticks=[], yticks=[], add_pareto=False):
-    
-    if len(xticks) == 0:
-        xticks = np.linspace(0, round(pop_over_gen_df[objective1].max() + 10, -1), round((pop_over_gen_df[objective1].max() + 10) // 10))
-
-    if len(yticks) == 0:
-        if objective2 == 'Avg_Percentage':
-            yticks = np.linspace(0, round(pop_over_gen_df[objective2].max(), -1), 5)
-        else:
-            yticks = np.linspace(0, round(pop_over_gen_df[objective2].max() + 10, -1), round((pop_over_gen_df[objective2].max() + 10) // 10))
-
-    colors = ['blue', 'orange', 'black', 'red', 'purple', 'brown', 'pink', 'gray', 'cyan', 'olive', 'yellow']
-        
-    fig_animation = make_subplots()
-    
-    frames = []
-
-    gens = pop_over_gen_df['Gen'].unique()
-
-    # Loop through each generation and plot scatter points and optionally the Pareto frontier
-    for gen in gens:
-        df = pop_over_gen_df[pop_over_gen_df['Gen'] == gen]
-        
-        # Scatter plot for each generation
-        scatter = go.Scatter(x=df[objective1],y=df[objective2],hovertext=df.apply(lambda row: '<br>'.join([f'{col}: {row[col]}' for col in df.columns]), axis=1),hoverinfo='text',mode='markers',
-            name=f'{gen}',marker=dict(color=colors[gen % len(colors)], size=8))
-        
-        if gen == 0:
-            fig_animation.add_trace(scatter)
-
-        if add_pareto:
-            pareto_frontier = create_pareto(df,objective1=objective1, obj1_type=obj1_type,objective2=objective2,obj2_type=obj2_type,plot=False)
-
-            pareto_trace = go.Scatter(x=pareto_frontier[objective1],y=pareto_frontier[objective2],hovertext=pareto_frontier.apply(lambda row: '<br>'.join([f'{col}: {row[col]}' for col in pareto_frontier.columns]), axis=1),
-                hoverinfo='text',mode='lines+markers',name=f'Pareto Frontier {gen}',line=dict(color='green'),marker=dict(size=8))
-            
-            if gen == 0:
-                fig_animation.add_trace(pareto_trace)
-
-            frames.append(go.Frame(data=[scatter, pareto_trace], name=str(gen)))
-        else:
-            frames.append(go.Frame(data=[scatter], name=str(gen)))
-
-    if constraint:
-        if 'Time' in objective1:
-            fig_animation.add_vline(30, line_dash='dash', line_color='red')
-            fig_animation.add_annotation(x=30.5,y=yticks[-1]//2, text='30 Day Constraint', font=dict(color='red', size=15), textangle=90, showarrow=False)
-        elif 'Time' in objective2:
-            fig_animation.add_hline(30, line_dash='dash', line_color='red')
-            fig_animation.add_annotation(x=xticks[-1]/2,y=33, text='30 Day Constraint', font=dict(color='red', size=15), textangle=0, showarrow=False)
-
-    
-    fig_animation.update_layout(
-        title=f'{plot_title}',
-        xaxis_title=objective1,
-        yaxis_title=objective2,
-        xaxis=dict(tickmode='array', tickvals=xticks, range=[xticks[0], xticks[-1]]),
-        yaxis=dict(tickmode='array', tickvals=yticks, range=[yticks[0]-10, yticks[-1]+10]),
-        legend=dict(title='Gen', title_font=dict(size=15), font=dict(size=12, color='black')),
-        template='plotly_white',
-        font=dict(size=15), 
-        updatemenus=[{
-            'buttons': [
-                {
-                    'args': [None, {'frame': {'duration': 500, 'redraw': True}, 'fromcurrent': True}],
-                    'label': 'Play',
-                    'method': 'animate'
-                },
-                {
-                    'args': [[None], {'frame': {'duration': 0, 'redraw': True}, 'mode': 'immediate'}],
-                    'label': 'Pause',
-                    'method': 'animate'
-                }
-            ],
-            'direction': 'left',
-            'pad': {'r': 10, 't': 87},
-            'showactive': False,
-            'type': 'buttons',
-            'x': 0.1,
-            'xanchor': 'right',
-            'y': 0,
-            'yanchor': 'top'
-        }],
-        sliders=[{
-            'active': 0,
-            'yanchor': 'top',
-            'xanchor': 'left',
-            'currentvalue': {
-                'font': {'size': 20},
-                'prefix': 'Generation: ',
-                'visible': True,
-                'xanchor': 'right'
-            },
-            'transition': {'duration': 300, 'easing': 'cubic-in-out'},
-            'pad': {'b': 10, 't': 50},
-            'len': 0.9,
-            'x': 0.1,
-            'y': 0,
-            'steps': [
-                {
-                    'args': [[str(gen)], {'frame': {'duration': 300, 'redraw': True}, 'mode': 'immediate', 'transition': {'duration': 300}}],
-                    'label': str(gen),
-                    'method': 'animate'
-                } for gen in gens
-            ]
-        }]
-    )
-    fig_animation.frames = frames
-    fig_animation.show()
-
     
 def Load_Individual(Individual=[0,0,0,0,0,0]):
     Alt = Individual[0]
