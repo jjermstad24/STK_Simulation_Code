@@ -16,6 +16,7 @@ from deap import creator
 from deap import tools
 from IPython.display import clear_output
 import scipy.interpolate as interpolate
+import json
 import gc
 
 def time_convert(date):
@@ -25,13 +26,6 @@ def time_convert(date):
     except:
         t = datetime.datetime.strptime(date, fmt)
     return pd.Timestamp(year=t.year, month=t.month, day=t.day, hour = t.hour, minute = t.minute ,second=t.second, microsecond=t.microsecond)
-
-def Create_Poly(filename):
-    df = pd.read_csv(filename)
-    l = []
-    for i in range(len(df)):
-        l.append((df['Lat'][i],df['Lon'][i]))
-    return Polygon(l)
 
 def get_ind(n_planes):
     df = pd.read_csv(f"../../Output_Files/pareto.csv")
@@ -43,29 +37,6 @@ def get_ind(n_planes):
         return df.iloc[0].to_list()
     else:
         return 0
-
-def plot_targets_and_polygon(poly,filename):
-    df = pd.read_csv(filename)
-    fig = go.Figure(go.Scattermapbox(
-        mode = "markers",
-        lon = df['Lon'],
-        lat = df['Lat'],
-        marker = {'size': 10}))
-
-    fig.add_trace(go.Scattermapbox(
-        mode = "lines",
-        lon = np.array(poly.exterior.coords.xy)[0],
-        lat = np.array(poly.exterior.coords.xy)[1],
-        marker = {'size': 10}))
-
-    fig.update_layout(
-        margin ={'l':0,'t':0,'b':0,'r':0},
-        mapbox = {
-            'center': {'lon': 0, 'lat': 0},
-            'style': "open-street-map",
-            'center': {'lon': 0, 'lat': 0},
-            'zoom': 0})
-    return fig
 
 def Interpolate(time,az,el):
     times = np.arange(time[0],time[-1],2.5)
@@ -148,9 +119,6 @@ def Generate_Performance_Curve(cost_curve_dicts, curve_type='Optimization', xaxi
     fig.show()
 
 def send_message_to_discord(message, channel_id = 1203813613903675502,bot_token=32):
-
-    
-
     if len(bot_token) > 10:
         import discord
         import nest_asyncio
@@ -172,7 +140,7 @@ def send_message_to_discord(message, channel_id = 1203813613903675502,bot_token=
             await bot.close()
         bot.run(bot_token)
 
-def create_pareto(df,objective1='Cost',obj1_type=-1, objective2='Avg_Percentage',obj2_type=1, plot=True,plot_title='Pareto Frontier'):
+def create_pareto(df,objective1='Cost',obj1_type=-1, objective2='Avg_Percentage',obj2_type=1, plot=True,plot_title='Pareto Frontier',xlabel='',ylabel=''):
 
     if obj1_type < 0:
         df = df.sort_values(by=objective1,ascending=True,ignore_index = True)
@@ -210,10 +178,45 @@ def create_pareto(df,objective1='Cost',obj1_type=-1, objective2='Avg_Percentage'
         
         fig.add_trace(scatter)
         fig.add_trace(pareto_line)
-        fig.update_layout(title=f'{plot_title}',xaxis_title=f'{objective1}',yaxis_title=f'{objective2}',legend=dict(x=1, y=1.25),template='plotly_white')
+
+        if len(xlabel) == 0:
+            xlabel = objective1
+        if len(ylabel) == 0:
+            ylabel = objective2
+
+        fig.update_layout(title=f'{plot_title}',xaxis_title=f'{xlabel}',yaxis_title=f'{ylabel}',legend=dict(x=1, y=1.25),template='plotly_white')
         fig.show()
 
     return pareto_frontier
+
+def evaluate_pareto_performance(stk_object,targets=[15,65]):
+    df = pd.read_csv('../../Output_Files/pareto.csv')
+    pareto_performance = {}
+    
+    with open('../../Output_Files/pareto_performance.json', "r") as json_file:
+        past_performance = json.load(json_file)
+
+    for idx,design in df.iterrows():
+        pareto_performance[f'Design {idx}'] = {'Number of Planes':int(design['Num_Planes']),
+                                'Cost':design['Cost']}
+        for tar_num in targets:
+            pareto_performance[f'Design {idx}'][f'Targets {tar_num}'] = {}
+
+            if f'Targets {tar_num}' in past_performance[f'Design {idx}'].keys():
+                pareto_performance[f'Design {idx}'][f'Targets {tar_num}'] = past_performance[f'Design {idx}'][f'Targets {tar_num}']
+            else:
+                Load_Individual(design.tolist()[:6])
+                stk_object.Target_Loader(f'../../Input_Files/Target_Packages/Targets_{tar_num}.txt')
+                stk_object.Satellite_Loader('../../Input_Files/Satellites_File.txt')
+                stk_object.Results_Runner(Plan=True,enable_print=False)
+                stk_object.Create_Data_Comparison_df()
+                pareto_performance[f'Design {idx}'][f'Targets {tar_num}']['Unplanned (%)'] = stk_object.data_comparison['Unplanned (%)'].to_list()
+                pareto_performance[f'Design {idx}'][f'Targets {tar_num}']['Unplanned (Time)'] = stk_object.data_comparison['Unplanned (Time)'].to_list()
+                pareto_performance[f'Design {idx}'][f'Targets {tar_num}']['Planned (%)'] = stk_object.data_comparison['Planned (%)'].to_list()
+                pareto_performance[f'Design {idx}'][f'Targets {tar_num}']['Planned (Time)'] = stk_object.data_comparison['Planned (Time)'].to_list()
+
+    with open('../../Output_Files/pareto_performance.json', "w") as json_file:
+        json.dump(pareto_performance, json_file, indent=4)
     
 def Load_Individual(Individual=[0,0,0,0,0,0]):
     Alt = Individual[0]

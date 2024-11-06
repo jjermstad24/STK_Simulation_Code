@@ -1,9 +1,10 @@
 from Scripts import *
 
 class MultiObjectiveOptimizer:
-    def __init__(self, stk_object, n_pop, n_gen,historical_df,cost_df):
-        self.cost_df = cost_df
-        self.historical_df = historical_df
+    def __init__(self, stk_object, n_pop, n_gen):
+        self.cost_df = pd.read_csv('../../Input_Files/Cost.csv').set_index('System')
+        self.historical_df = pd.read_csv('../../Output_Files/historical.csv')
+
         self.stk_object = stk_object
         self.n_pop = n_pop
         self.n_gen = n_gen
