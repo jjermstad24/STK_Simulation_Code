@@ -189,7 +189,7 @@ def create_pareto(df,objective1='Cost',obj1_type=-1, objective2='Avg_Percentage'
 
     return pareto_frontier
 
-def evaluate_pareto_performance(stk_object,targets=[15,65]):
+def evaluate_pareto_performance(stk_object,targets=[15,65], past=False):
     df = pd.read_csv('../../Output_Files/pareto.csv')
     pareto_performance = {}
     
@@ -202,7 +202,7 @@ def evaluate_pareto_performance(stk_object,targets=[15,65]):
         for tar_num in targets:
             pareto_performance[f'Design {idx}'][f'Targets {tar_num}'] = {}
 
-            if f'Targets {tar_num}' in past_performance[f'Design {idx}'].keys():
+            if past and f'Targets {tar_num}' in past_performance[f'Design {idx}'].keys():
                 pareto_performance[f'Design {idx}'][f'Targets {tar_num}'] = past_performance[f'Design {idx}'][f'Targets {tar_num}']
             else:
                 Load_Individual(design.tolist()[:6])
