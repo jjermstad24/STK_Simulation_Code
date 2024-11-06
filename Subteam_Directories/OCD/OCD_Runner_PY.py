@@ -12,14 +12,14 @@ stk_object.set_sim_time(days=30)
 stk_object.Target_Loader("../../Input_Files/Target_Packages/Targets_65.txt")
 
 cost_df = pd.read_csv('../../Input_Files/Cost.csv').set_index('System')
-historical_df = pd.read_csv('../../Pop_Over_Gen/historical.csv')
+historical_df = pd.read_csv('../../Output_Files/historical.csv')
 
-num_planes = 3
+num_planes = 8
 
-bot_token = 2
+bot_token=3
 
 try:
-    opt = MultiObjectiveOptimizer(stk_object,n_pop=25,n_gen=10,historical_df=historical_df,cost_df=cost_df)
+    opt = MultiObjectiveOptimizer(stk_object,n_pop=10,n_gen=10,historical_df=historical_df,cost_df=cost_df)
     opt.lower[5] = num_planes
     opt.upper[5] = num_planes
     opt.lower[4] = num_planes

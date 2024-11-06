@@ -34,7 +34,7 @@ def Create_Poly(filename):
     return Polygon(l)
 
 def get_ind(n_planes):
-    df = pd.read_csv(f"../../Pop_Over_Gen/pareto.csv")
+    df = pd.read_csv(f"../../Output_Files/pareto.csv")
     df = df[df['Num_Planes'] == n_planes]
     if len(df) > 0:
         df = df.sort_values(by='Avg_Time')

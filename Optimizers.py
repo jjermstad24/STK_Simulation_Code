@@ -197,7 +197,7 @@ class MultiObjectiveOptimizer:
         return total_cost
     
     def write_population_to_csv(self, Individual, objectives, write_type):
-       output_file = f"../../Pop_Over_Gen/historical.csv"
+       output_file = f"../../Output_Files/historical.csv"
        with open(output_file, write_type) as file:
             for dv in Individual:
                 file.write(f"{dv},")
