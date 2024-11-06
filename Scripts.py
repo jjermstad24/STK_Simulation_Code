@@ -33,10 +33,16 @@ def Create_Poly(filename):
         l.append((df['Lat'][i],df['Lon'][i]))
     return Polygon(l)
 
-def get_ind(n_sats):
-    df = pd.read_csv(f"../../Input_Files/Constellations/{n_sats}.txt")
-    asc = np.unique(df['Asc'])
-    return [df["Per"].values[0],df["Inc"].values[0],asc[0],abs(asc[1]-asc[0]),len(df),len(asc)]
+def get_ind(n_planes):
+    df = pd.read_csv(f"../../Pop_Over_Gen/pareto.csv")
+    df = df[df['Num_Planes'] == n_planes]
+    if len(df) > 0:
+        df = df.sort_values(by='Avg_Time')
+        df = df.reset_index(drop=True)
+        df = df[df.columns[:6]]
+        return df.iloc[0].to_list()
+    else:
+        return 0
 
 def plot_targets_and_polygon(poly,filename):
     df = pd.read_csv(filename)
