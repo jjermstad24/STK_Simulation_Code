@@ -30,6 +30,7 @@ class STK_Simulation:
         #Creating a new scenario
         self.scenario = self.root.NewScenario(Filename)
         self.dt = 60
+        self.set_sim_time(days=1)
         self.Interpolate = False
         self.root.ExecuteCommand("Parallel / AutomaticallyComputeInParallel On")
         self.root.ExecuteCommand(f"Parallel / Configuration ParallelType Local NumberOfLocalCores {os.cpu_count()}")

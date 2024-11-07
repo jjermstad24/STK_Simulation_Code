@@ -191,7 +191,7 @@ class MultiObjectiveOptimizer:
 
         operations_cost = 132565233
         first_sat_cost = cost_df['First_Sat_Cost'].sum()
-        additional_sats_cost = (cost_df['Add_Sat_Cost']*(n_sats-1)).sum()
+        additional_sats_cost = sum([first_sat_cost*(0.85)**(np.log2(i)) for i in range(2,int(n_sats)+1)])
         launch_costs = cost_per_launch*n_planes
         
         total_cost = operations_cost +  first_sat_cost + additional_sats_cost + launch_costs
