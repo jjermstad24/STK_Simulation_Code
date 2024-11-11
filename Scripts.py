@@ -349,3 +349,33 @@ def json_to_html(json_data, output_file="json_viewer.html"):
     # Write the HTML content to an output file with utf-8 encoding
     with open(output_file, "w", encoding="utf-8") as file:
         file.write(html_content)
+
+def Generate_Performance_Curve():
+    with open('../../Output_Files/pareto_performance.json', "r") as json_file:
+        pareto_performance_dict = json.load(json_file)
+    fig = go.Figure()
+    for Individual, design_data in pareto_performance_dict.items():
+        num_targets = [targets[:2] for targets in list(design_data.keys())[1:]]
+        times = [np.average(design_data[f'{targets}']['Planned (Time)']) for targets in list(design_data.keys())[1:]]
+        percentages = [np.average(design_data[f'{targets}']['Planned (%)']) for targets in list(design_data.keys())[1:]]
+        cost = int(design_data['Cost']/1e6)
+        design = pd.DataFrame([Individual[1:-1].split(',')], columns=['Alt','Inc', 'Initial_Raan','Delta_Raan','Num_Sats', 'Num_Planes'])
+        fig.add_trace(go.Scatter(
+            x=num_targets,
+            y=times,
+            hovertext=design.apply(lambda row: '<br>'.join([f'{col}: {row[col]}' for col in design.columns]), axis=1),
+            hoverinfo='text',
+            mode='lines+markers',
+            name=str(cost)))
+        
+    fig.add_hline(30, line_dash='dash', line_color='red')
+    fig.update_layout(
+        title='Average Time vs. Number of Targets',
+        xaxis_title='Number of Targets',
+        yaxis_title='Average Time',
+        legend_title='Cost [M$]',
+        template='plotly',
+        height=600,
+        width=1000
+    )
+    fig.show()
