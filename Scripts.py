@@ -244,41 +244,40 @@ def Load_Individual(Individual=[0,0,0,0,0,0]):
         i+=1
     file.close()
     
-def Evaluate_Design(previous_design,tar_num):
-    previous_design[f'{tar_num} Targets'] = {}
-    previous_design[f'{tar_num} Targets']['Duration'] = stk_object.root.CurrentScenario.StopTime/86400
-    
-    stk_object.Target_Loader(f"../../Input_Files/Target_Packages/Targets_{tar_num}.txt")
-    
-    Load_Individual(ind)
-    stk_object.Satellite_Loader("../../Input_Files/Satellites_File.txt")
-    
-    stk_object.Results_Runner()
-    stk_object.Create_Data_Comparison_df()
-    df = stk_object.data_comparison
-    for key in ['Unplanned (%)', 'Unplanned (Time)', 'Planned (%)', 'Planned (Time)']:
-        previous_design[f'{tar_num} Targets'][key] = df[key].to_list()
-
-def Update_Pareto_Performance(stk_object,design_idx,target_list=[15,34]):
-
+def Update_Pareto_Performance(stk_object,design_idx,tar_list=[15,34]):
     pareto_designs = pd.read_csv("../../Output_Files/pareto.csv")
 
     with open('../../Output_Files/pareto_performance.json', "r") as json_file:
-        previous_dict = json.load(json_file)
+        design_evaluations = json.load(json_file)
 
-    previous_design = previous_dict[f'Design {design_idx}']
+    new_df = {}
 
-    design = pareto_designs.iloc[design_idx]
-    ind = design.tolist()[:6]
+    execute = len(pareto_designs)*[False]
+    execute[design_idx] = True
+
+    for idx,design in pareto_designs.iterrows():
+        ind = design.tolist()[:6]
         
-    for tar_num in target_list:
-        if ind != previous_design['Individual'] or not(f'{tar_num} Targets' in previous_design.keys()):
-            Evaluate_Design(previous_design,tar_num)
-        elif previous_design[f'{tar_num} Targets']['Duration'] < stk_object.root.CurrentScenario.StopTime/86400:
-            Evaluate_Design(previous_design,tar_num)
-                        
-    previous_design['Individual'] = ind
-    previous_design['Cost'] = design.iloc[8]
+        if not(f'{ind}' in design_evaluations.keys()):
+            new_df[f'{ind}'] = {"Cost":design.iloc[8]}
+        else:
+            new_df[f'{ind}'] = design_evaluations[f'{ind}']
+        
+        for tar_num in tar_list:
+            if execute[idx]:
+                new_df[f'{ind}'][f'{tar_num} Targets'] = {}
+                stk_object.Target_Loader(f"../../Input_Files/Target_Packages/Targets_{tar_num}.txt")
+                
+                Load_Individual(ind)
+                stk_object.Satellite_Loader("../../Input_Files/Satellites_File.txt")
+                
+                stk_object.Results_Runner()
+                stk_object.Create_Data_Comparison_df()
+                df = stk_object.data_comparison
+                for key in ['Unplanned (%)', 'Unplanned (Time)', 'Planned (%)', 'Planned (Time)']:
+                    new_df[f'{ind}'][f'{tar_num} Targets'][key] = df[key].to_list()
+            else:
+                new_df[f'{ind}'][f'{tar_num} Targets'] = design_evaluations[f'{ind}'][f'{tar_num} Targets']
                 
     with open('../../Output_Files/pareto_performance.json', "w") as json_file:
-        json.dump(previous_dict,json_file,indent=4)
+        json.dump(new_df,json_file,indent=4)
