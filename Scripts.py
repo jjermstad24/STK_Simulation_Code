@@ -278,9 +278,10 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_list=[15,34]):
                     new_df[f'{ind}'][f'{tar_num} Targets'][key] = df[key].to_list()
             else:
                 new_df[f'{ind}'][f'{tar_num} Targets'] = design_evaluations[f'{ind}'][f'{tar_num} Targets']
+            with open('../../Output_Files/pareto_performance.json', "w") as json_file:
+                json.dump(new_df,json_file,indent=4)
                 
-    with open('../../Output_Files/pareto_performance.json', "w") as json_file:
-        json.dump(new_df,json_file,indent=4)
+
 
 def json_to_html(json_data, output_file="json_viewer.html"):
     # HTML template with JavaScript and CSS for collapsible keys
