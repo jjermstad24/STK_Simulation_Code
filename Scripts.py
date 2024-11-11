@@ -281,3 +281,71 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_list=[15,34]):
                 
     with open('../../Output_Files/pareto_performance.json', "w") as json_file:
         json.dump(new_df,json_file,indent=4)
+
+def json_to_html(json_data, output_file="json_viewer.html"):
+    # HTML template with JavaScript and CSS for collapsible keys
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>JSON Viewer</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; }}
+            ul {{ list-style-type: none; }}
+            .collapsible {{ cursor: pointer; }}
+            .nested {{ display: none; }}
+            .active {{ display: block; }}
+        </style>
+    </head>
+    <body>
+        <h2>JSON Viewer</h2>
+        <ul id="jsonContainer"></ul>
+        <script>
+            // JSON data as a JavaScript variable
+            const jsonData = {json.dumps(json_data, indent=4)};
+
+            function createTreeView(obj, container) {{
+                for (let key in obj) {{
+                    if (obj.hasOwnProperty(key)) {{
+                        const li = document.createElement("li");
+                        if (typeof obj[key] === 'object' && obj[key] !== null) {{
+                            li.innerHTML = '<span class="collapsible">➕ ' + key + '</span>';
+                            const nestedUl = document.createElement("ul");
+                            nestedUl.classList.add("nested");
+                            createTreeView(obj[key], nestedUl);
+                            li.appendChild(nestedUl);
+                        }} else {{
+                            li.textContent = key + ": " + obj[key];
+                        }}
+                        container.appendChild(li);
+                    }}
+                }}
+            }}
+
+            // Toggle display for collapsible items
+            document.addEventListener("click", function(e) {{
+                if (e.target.classList.contains("collapsible")) {{
+                    e.target.classList.toggle("active");
+                    const content = e.target.nextElementSibling;
+                    if (content) {{
+                        content.classList.toggle("active");
+                        e.target.textContent = e.target.textContent.includes("➕") 
+                            ? e.target.textContent.replace("➕", "➖") 
+                            : e.target.textContent.replace("➖", "➕");
+                    }}
+                }}
+            }});
+
+            // Initialize the JSON viewer
+            const jsonContainer = document.getElementById("jsonContainer");
+            createTreeView(jsonData, jsonContainer);
+        </script>
+    </body>
+    </html>
+    """
+
+    # Write the HTML content to an output file with utf-8 encoding
+    with open(output_file, "w", encoding="utf-8") as file:
+        file.write(html_content)
