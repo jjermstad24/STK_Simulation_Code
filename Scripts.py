@@ -262,7 +262,7 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_list=[15,34]):
             new_df[f'{ind}'] = {"Cost":design.iloc[8]}
         else:
             new_df[f'{ind}'] = design_evaluations[f'{ind}']
-        
+
         for tar_num in tar_list:
             if execute[idx]:
                 new_df[f'{ind}'][f'{tar_num} Targets'] = {}
@@ -276,10 +276,10 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_list=[15,34]):
                 df = stk_object.data_comparison
                 for key in ['Unplanned (%)', 'Unplanned (Time)', 'Planned (%)', 'Planned (Time)']:
                     new_df[f'{ind}'][f'{tar_num} Targets'][key] = df[key].to_list()
-            else:
-                new_df[f'{ind}'][f'{tar_num} Targets'] = design_evaluations[f'{ind}'][f'{tar_num} Targets']
-            with open('../../Output_Files/pareto_performance.json', "w") as json_file:
-                json.dump(new_df,json_file,indent=4)
+
+
+    with open('../../Output_Files/pareto_performance.json', "w") as json_file:
+        json.dump(new_df,json_file,indent=4)
                 
 
 
@@ -356,14 +356,18 @@ def Generate_Performance_Curve():
         pareto_performance_dict = json.load(json_file)
     fig = go.Figure()
     for Individual, design_data in pareto_performance_dict.items():
-        num_targets = [targets[:2] for targets in list(design_data.keys())[1:]]
+        num_targets = [int(targets.split(' ')[0]) for targets in list(design_data.keys())[1:]]
         times = [np.average(design_data[f'{targets}']['Planned (Time)']) for targets in list(design_data.keys())[1:]]
         percentages = [np.average(design_data[f'{targets}']['Planned (%)']) for targets in list(design_data.keys())[1:]]
+
+        results_df = pd.DataFrame({'Tar_Num': num_targets, 'Times': times, 'Percentages': percentages})
+        results_df = results_df[results_df['Percentages'] == 100]
+
         cost = int(design_data['Cost']/1e6)
         design = pd.DataFrame([Individual[1:-1].split(',')], columns=['Alt','Inc', 'Initial_Raan','Delta_Raan','Num_Sats', 'Num_Planes'])
         fig.add_trace(go.Scatter(
-            x=num_targets,
-            y=times,
+            x=results_df['Tar_Num'],
+            y=results_df['Times'],
             hovertext=design.apply(lambda row: '<br>'.join([f'{col}: {row[col]}' for col in design.columns]), axis=1),
             hoverinfo='text',
             mode='lines+markers',
