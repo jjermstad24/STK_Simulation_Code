@@ -188,35 +188,6 @@ def create_pareto(df,objective1='Cost',obj1_type=-1, objective2='Avg_Percentage'
         fig.show()
 
     return pareto_frontier
-
-def evaluate_pareto_performance(stk_object,targets=[15,65], past=False):
-    df = pd.read_csv('../../Output_Files/pareto.csv')
-    pareto_performance = {}
-    
-    with open('../../Output_Files/pareto_performance.json', "r") as json_file:
-        past_performance = json.load(json_file)
-
-    for idx,design in df.iterrows():
-        pareto_performance[f'Design {idx}'] = {'Number of Planes':int(design['Num_Planes']),
-                                'Cost':design['Cost']}
-        for tar_num in targets:
-            pareto_performance[f'Design {idx}'][f'Targets {tar_num}'] = {}
-
-            if past and f'Targets {tar_num}' in past_performance[f'Design {idx}'].keys():
-                pareto_performance[f'Design {idx}'][f'Targets {tar_num}'] = past_performance[f'Design {idx}'][f'Targets {tar_num}']
-            else:
-                Load_Individual(design.tolist()[:6])
-                stk_object.Target_Loader(f'../../Input_Files/Target_Packages/Targets_{tar_num}.txt')
-                stk_object.Satellite_Loader('../../Input_Files/Satellites_File.txt')
-                stk_object.Results_Runner(Plan=True,enable_print=False)
-                stk_object.Create_Data_Comparison_df()
-                pareto_performance[f'Design {idx}'][f'Targets {tar_num}']['Unplanned (%)'] = stk_object.data_comparison['Unplanned (%)'].to_list()
-                pareto_performance[f'Design {idx}'][f'Targets {tar_num}']['Unplanned (Time)'] = stk_object.data_comparison['Unplanned (Time)'].to_list()
-                pareto_performance[f'Design {idx}'][f'Targets {tar_num}']['Planned (%)'] = stk_object.data_comparison['Planned (%)'].to_list()
-                pareto_performance[f'Design {idx}'][f'Targets {tar_num}']['Planned (Time)'] = stk_object.data_comparison['Planned (Time)'].to_list()
-
-    with open('../../Output_Files/pareto_performance.json', "w") as json_file:
-        json.dump(pareto_performance, json_file, indent=4)
     
 def Load_Individual(Individual=[0,0,0,0,0,0]):
     Alt = Individual[0]
@@ -271,7 +242,12 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_list=[15,34]):
                 Load_Individual(ind)
                 stk_object.Satellite_Loader("../../Input_Files/Satellites_File.txt")
                 
-                stk_object.Results_Runner()
+                stk_object.Generate_Pre_Planning_Data()
+                stk_object.Plan(1,20,enable_print=True)
+                if np.average([np.count_nonzero(stk_object.target_bins[tar_num])/324*100 for tar_num in range(len(stk_object.targets))]) > 50:
+                    stk_object.hundred = True
+                else:
+                    stk_object.hundred = False
                 stk_object.Create_Data_Comparison_df()
                 df = stk_object.data_comparison
                 for key in ['Unplanned (%)', 'Unplanned (Time)', 'Planned (%)', 'Planned (Time)']:
