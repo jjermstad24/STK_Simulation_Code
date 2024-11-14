@@ -234,7 +234,8 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_list=[15,34]):
                 stk_object.Satellite_Loader("../../Input_Files/Satellites_File.txt")
                 
                 stk_object.Generate_Pre_Planning_Data()
-                stk_object.Plan(enable_print=True)
+                # stk_object.Plan(enable_print=True)
+                stk_object.Plan_Mixed_Sorting()
 
                 t2 = time.time()
 
