@@ -34,6 +34,11 @@ class STK_Simulation:
         self.Interpolate = False
         self.root.ExecuteCommand("Parallel / AutomaticallyComputeInParallel On")
         self.root.ExecuteCommand(f"Parallel / Configuration ParallelType Local NumberOfLocalCores {os.cpu_count()}")
+        self.opt = False
+        self.slew_rate = 1
+        self.cone_angle = 20
+        self.eps = 1.1920929e-07
+        self.sorting_fraction = 0.5
 
     def Target_Loader(self,Filename):
         self.targets = []
@@ -221,24 +226,22 @@ class STK_Simulation:
                                         if (any(t[0] <= value <= t[1] for value in t_az[0]) or 
                                             any(t_az[0][0] <= value <= t_az[0][1] for value in t)):
                                             self.Update_Target_Bins(t_az[0][0],i*9+j,tar_num)
-                                            time_range = [float(i) for i in np.append(np.arange(t_az[0][0],t_az[0][1],self.dt),t_az[0][1])]
+                                            time_range = [float(i) for i in np.append(np.arange(t_az[0][0]+self.eps,t_az[0][1],self.dt),t_az[0][1]-self.eps)]
                                             times.extend(time_range)
                                             bins.extend(len(time_range)*[i*9+j])
                                             
                     access = sat.GetAccessToObject(tar)
                     access.ComputeAccess()
-                    res = access.DataProviders.GetItemByName('Sat Angles Data').ExecSingleElementsArray(times,['Cross Track','Along Track'])
-                    crosstrack = res.GetArray(0)
-                    alongtrack = res.GetArray(1)
-                    for b,t,ct,at in zip(bins,times,crosstrack,alongtrack):
-                        self.Pre_Planning_Hash_Map[tar_num][b].append([t,ct,at,sat_num])
+                    res = access.DataProviders.GetItemByName("Sensor Based Angles").Group.Item(0).ExecSingleElementsArray(times,['Angle Off Boresight'])
+                    dtheta = np.array(res.GetArray(0),dtype=float)-self.cone_angle
+                    dtheta = np.maximum(dtheta,0)
+                    for b,t,dtheta in zip(bins,times,dtheta):
+                        self.Pre_Planning_Hash_Map[tar_num][b].append([t,dtheta,sat_num])
                     bar()                
                 if self.opt and (np.count_nonzero(self.target_bins[tar_num])/324 < 1.0):
                     sort = False
                     break
 
-
-        
         if sort:
             with alive_bar(len(self.targets)*324,force_tty=True,bar='classic',title='- Sorting_Data',length=10,disable=not(enable_print)) as bar:
                 for tar_num in range(len(self.targets)):
@@ -250,42 +253,88 @@ class STK_Simulation:
         
         return 0
         
-    def Plan(self,slew_rate,cone_angle,time_threshold=6000,enable_print=True):
-        satellite_specific_plan = {key:{"Time":[],"Target":[],"Bin Number":[],"Cross Range":[],"Along Range":[]} for key in range(len(self.satellites))}
+    def Plan(self,enable_print=True):
+        satellite_specific_plan = {key:{"Time":[],"Target":[],"Bin Number":[],"dTheta":[]} for key in range(len(self.satellites))}
         bins = np.reshape([[[count,tar_num,bin_num] for bin_num,count in enumerate(tar_bin.ravel())] for tar_num,tar_bin in enumerate(self.target_bins)],[len(self.targets)*324,3]).astype(int)
         with alive_bar(324*len(self.targets),force_tty=True,bar='classic',title=f'- Planning',length=10,disable=not(enable_print)) as bar:
             for count,tar_num,bin_num in bins[bins[:,0].argsort()]:
                 if count > 0:
-                    result = get_best_available_access(satellite_specific_plan,self.Pre_Planning_Hash_Map[tar_num][bin_num],slew_rate,cone_angle,time_threshold)
+                    result = get_best_available_access(satellite_specific_plan,self.Pre_Planning_Hash_Map[tar_num][bin_num],self.slew_rate)
                     if type(result)!=bool and result is not None:
-                        sat_num = int(result[3])
+                        sat_num = int(result[2])
                         satellite_specific_plan[sat_num]["Time"].append(result[0])
                         satellite_specific_plan[sat_num]["Target"].append(tar_num)
                         satellite_specific_plan[sat_num]["Bin Number"].append(bin_num)
-                        satellite_specific_plan[sat_num]["Cross Range"].append(result[1])
-                        satellite_specific_plan[sat_num]["Along Range"].append(result[2])
+                        satellite_specific_plan[sat_num]["dTheta"].append(result[1])
                 bar()
                 
         Times = []
         Sats = []
-        Cross_Range = []
-        Along_Range = []
+        dTheta = []
         Targets = []
         Bins = []
         for sat_num in satellite_specific_plan:
             Times.extend(satellite_specific_plan[sat_num]["Time"])
             Sats.extend(len(satellite_specific_plan[sat_num]["Time"])*[sat_num])
-            Cross_Range.extend(satellite_specific_plan[sat_num]["Cross Range"])
-            Along_Range.extend(satellite_specific_plan[sat_num]["Along Range"])
+            dTheta.extend(satellite_specific_plan[sat_num]["dTheta"])
             Targets.extend(satellite_specific_plan[sat_num]["Target"])
             Bins.extend(satellite_specific_plan[sat_num]["Bin Number"])
 
         self.Planned_Data = pd.DataFrame({"Time":Times,
-                                          "Satellite":Sats,
-                                          "Target":Targets,
-                                          "Cross Track":Cross_Range,
-                                          "Along Track":Along_Range,
-                                          "Bin Number":Bins})
+                                            "Satellite":Sats,
+                                            "Target":Targets,
+                                            "dTheta":dTheta,
+                                            "Bin Number":Bins})
+        return 0
+    
+    def Plan_Mixed_Sorting(self,enable_print=True):
+        satellite_specific_plan = {key:{"Time":[],"Target":[],"Bin Number":[],"dTheta":[]} for key in range(len(self.satellites))}
+        bins = []
+        for tar_num,(tar_bin,tar_times) in enumerate(zip(self.target_bins,self.target_times)):
+            for bin_num,(count,time) in enumerate(zip(tar_bin.ravel(),tar_times.ravel())):
+                bins.append([count,tar_num,bin_num,time])
+        bins = np.reshape(bins,[len(self.targets)*324,4]).astype(int)
+
+        len1 = int(len(bins)*self.sorting_fraction)
+
+        bins = bins[bins[:, 0].argsort()]
+
+        bins_sorted_col1 = bins[:len1]
+
+        bins_sorted_col4 = bins[len1:]
+        bins_sorted_col4 = bins_sorted_col4[bins_sorted_col4[:, 3].argsort()][::-1]
+
+        bins = np.vstack((bins_sorted_col1, bins_sorted_col4))
+
+        with alive_bar(324*len(self.targets),force_tty=True,bar='classic',title=f'- Planning',length=10,disable=not(enable_print)) as bar:
+            for count,tar_num,bin_num,min_time in bins:
+                if count > 0:
+                    result = get_best_available_access(satellite_specific_plan,self.Pre_Planning_Hash_Map[tar_num][bin_num],self.slew_rate)
+                    if type(result)!=bool and result is not None:
+                        sat_num = int(result[2])
+                        satellite_specific_plan[sat_num]["Time"].append(result[0])
+                        satellite_specific_plan[sat_num]["Target"].append(tar_num)
+                        satellite_specific_plan[sat_num]["Bin Number"].append(bin_num)
+                        satellite_specific_plan[sat_num]["dTheta"].append(result[1])
+                bar()
+                
+        Times = []
+        Sats = []
+        dTheta = []
+        Targets = []
+        Bins = []
+        for sat_num in satellite_specific_plan:
+            Times.extend(satellite_specific_plan[sat_num]["Time"])
+            Sats.extend(len(satellite_specific_plan[sat_num]["Time"])*[sat_num])
+            dTheta.extend(satellite_specific_plan[sat_num]["dTheta"])
+            Targets.extend(satellite_specific_plan[sat_num]["Target"])
+            Bins.extend(satellite_specific_plan[sat_num]["Bin Number"])
+
+        self.Planned_Data = pd.DataFrame({"Time":Times,
+                                            "Satellite":Sats,
+                                            "Target":Targets,
+                                            "dTheta":dTheta,
+                                            "Bin Number":Bins})
         return 0
 
     def set_sim_time(self,days=1, seconds=0, microseconds=0, milliseconds=0, minutes=0, hours=0, weeks=0):
@@ -303,7 +352,7 @@ class STK_Simulation:
             percentage = np.average([np.count_nonzero(self.target_bins[tar_num])/324*100 for tar_num in range(len(self.targets))])
 
             if percentage == 100:
-                self.Plan(1,20,enable_print=enable_print)
+                self.Plan(enable_print=enable_print)
                 self.hundred = True
             else:
                 self.hundred = False

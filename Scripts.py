@@ -18,6 +18,7 @@ from IPython.display import clear_output
 import scipy.interpolate as interpolate
 import json
 import gc
+import time
 
 def time_convert(date):
     fmt = "%d %b %Y %H:%M:%S.%f"
@@ -49,46 +50,35 @@ def Interpolate(time,az,el):
     return times,az_t,el_t
 
 def check_manueverability(previous_times,
-                          previous_crossrange,
-                          previous_alongrange,
+                          previous_dtheta,
                           new_time,
-                          new_crossrange,
-                          new_along_range,
-                          slew_rate,
-                          cone_angle):
-    d_theta_2 = np.hypot(new_crossrange, new_along_range) - cone_angle
-    d_theta_2 = max(d_theta_2, 0)  # Clamp to 0 if negative
+                          new_dtheta,
+                          slew_rate):
 
     if len(previous_times) > 0:
-        # Compute d_theta_1 for the previous points
-        d_theta_1 = np.hypot(previous_crossrange, previous_alongrange) - cone_angle
-        np.maximum(d_theta_1, 0, out=d_theta_1)  # Clamp values in-place
 
         # Calculate time differences
         d_time = np.abs(new_time - previous_times)
 
         # Return maneuverability condition, ensuring no division by zero
-        ratio = np.divide(d_theta_1 + d_theta_2, d_time,
+        ratio = np.divide(previous_dtheta + new_dtheta, d_time,
                           out=np.full_like(d_time, 10),
                           where=d_time != 0)
         
         return ratio <= slew_rate
 
     # Simplified handling for edge cases when there are no previous times
-    return [[slew_rate > 0 or (slew_rate == 0 and d_theta_2 == 0)]]
+    return [[slew_rate > 0 or (slew_rate == 0 and new_dtheta == 0)]]
 
-def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rate,cone_angle,time_threshold=60):
+def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rate):
     if len(bin_access_points)>0:
         for point in bin_access_points:
-            previous_sat_accesses = satellite_specific_plan[int(point[3])]
+            previous_sat_accesses = satellite_specific_plan[int(point[2])]
             feasible = check_manueverability(np.array(previous_sat_accesses["Time"]),
-                                             np.array(previous_sat_accesses["Cross Range"]),
-                                             np.array(previous_sat_accesses["Along Range"]),
+                                             np.array(previous_sat_accesses["dTheta"]),
                                              point[0],
                                              point[1],
-                                             point[2],
-                                             slew_rate,
-                                             cone_angle)
+                                             slew_rate)
             
             if np.all(feasible):
                 return point
@@ -239,20 +229,24 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_list=[15,34]):
                 new_df[f'{ind}'][f'{tar_num} Targets'] = {}
                 stk_object.Target_Loader(f"../../Input_Files/Target_Packages/Targets_{tar_num}.txt")
                 
+                t1 = time.time()
                 Load_Individual(ind)
                 stk_object.Satellite_Loader("../../Input_Files/Satellites_File.txt")
                 
                 stk_object.Generate_Pre_Planning_Data()
-                stk_object.Plan(1,20,enable_print=True)
-                if np.average([np.count_nonzero(stk_object.target_bins[tar_num])/324*100 for tar_num in range(len(stk_object.targets))]) > 50:
+                stk_object.Plan(enable_print=True)
+
+                t2 = time.time()
+
+                if np.average([np.count_nonzero(stk_object.target_bins[tar_num])/324*100 for tar_num in range(len(stk_object.targets))]) == 100:
                     stk_object.hundred = True
                 else:
                     stk_object.hundred = False
                 stk_object.Create_Data_Comparison_df()
                 df = stk_object.data_comparison
+                new_df[f'{ind}'][f'{tar_num} Targets']['Computation_Time'] = round(t2-t1,2)
                 for key in ['Unplanned (%)', 'Unplanned (Time)', 'Planned (%)', 'Planned (Time)']:
                     new_df[f'{ind}'][f'{tar_num} Targets'][key] = df[key].to_list()
-
 
     with open('../../Output_Files/pareto_performance.json', "w") as json_file:
         json.dump(new_df,json_file,indent=4)
