@@ -49,6 +49,11 @@ def Interpolate(time,az,el):
         az_t = ans[:,0]%360;el_t = ans[:,1]
     return times,az_t,el_t
 
+def find_range_for_data_point(data_point, bounds):
+    for i, (lower_bound, upper_bound) in enumerate(bounds):
+        if lower_bound <= data_point <= upper_bound:
+            return i
+
 def check_manueverability(previous_times,
                           previous_dtheta,
                           new_time,
@@ -70,10 +75,13 @@ def check_manueverability(previous_times,
     # Simplified handling for edge cases when there are no previous times
     return [[slew_rate > 0 or (slew_rate == 0 and new_dtheta == 0)]]
 
-def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rate):
+def get_best_available_access(satellite_specific_plan_per_bound,sat_bounds,bin_access_points,slew_rate):
     if len(bin_access_points)>0:
         for point in bin_access_points:
-            previous_sat_accesses = satellite_specific_plan[int(point[2])]
+            sat_num = int(point[2])
+            bounds = sat_bounds[sat_num]
+            bound_idx = find_range_for_data_point(point[0],bounds)
+            previous_sat_accesses = satellite_specific_plan_per_bound[sat_num][bound_idx]        
             feasible = check_manueverability(np.array(previous_sat_accesses["Time"]),
                                              np.array(previous_sat_accesses["dTheta"]),
                                              point[0],
@@ -81,8 +89,8 @@ def get_best_available_access(satellite_specific_plan,bin_access_points,slew_rat
                                              slew_rate)
             
             if np.all(feasible):
-                return point
-        return False
+                return point,bound_idx
+        return False,False
 
 def Generate_Performance_Curve(cost_curve_dicts, curve_type='Optimization', xaxis='Number of Targets', yaxis='Avg_time'):
     
@@ -232,7 +240,11 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_list=[15,34]):
                     previous_planned_percentage = np.average(new_df[f'{ind}'][f'{tar_num} Targets']['Planned (%)'])
                 except:
                     previous_planned_percentage = 0
-                print(f"(Design,Target,Previous(%)) = ({idx},{tar_num},{previous_planned_percentage})")
+                
+                for _ in range(44):print("-",end="")
+                print("")
+                print(f"(Design,Target,Previous(%)) = ({idx},{tar_num},{previous_planned_percentage:.2f})")
+
                 if previous_planned_percentage != 100.0:
                     try:
                         previous_duration = new_df[f'{ind}'][f'{tar_num} Targets']['Duration']
@@ -274,8 +286,6 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_list=[15,34]):
 
     return np.array(results)
                 
-
-
 def json_to_html(json_data, output_file="json_viewer.html"):
     # HTML template with JavaScript and CSS for collapsible keys
     html_content = f"""
