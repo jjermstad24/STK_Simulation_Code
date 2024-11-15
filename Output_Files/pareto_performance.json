@@ -3,6 +3,7 @@
         "Cost": 243224211.97,
         "15 Targets": {
             "Computation_Time": 188.68,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -74,6 +75,7 @@
         },
         "34 Targets": {
             "Computation_Time": 565.86,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -221,6 +223,7 @@
         },
         "59 Targets": {
             "Computation_Time": 1357.35,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -468,6 +471,7 @@
         },
         "77 Targets": {
             "Computation_Time": 2288.01,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -787,6 +791,7 @@
         },
         "105 Targets": {
             "Computation_Time": 4679.75,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -1218,6 +1223,7 @@
         },
         "182 Targets": {
             "Computation_Time": 16222.93,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -1959,6 +1965,7 @@
     "[616.0, 96.0, 61.0, 23.0, 6.0, 4.0]": {
         "Cost": 246607328.89,
         "15 Targets": {
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -2029,6 +2036,7 @@
             ]
         },
         "34 Targets": {
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -2175,6 +2183,7 @@
             ]
         },
         "59 Targets": {
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -2421,6 +2430,7 @@
             ]
         },
         "77 Targets": {
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -2739,6 +2749,7 @@
             ]
         },
         "105 Targets": {
+            "Duration": 30,
             "Unplanned (%)": [
                 99.38271604938271,
                 99.38271604938271,
@@ -3169,6 +3180,7 @@
             ]
         },
         "182 Targets": {
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -4376,6 +4388,7 @@
         "Cost": 267224211.97,
         "15 Targets": {
             "Computation_Time": 106.3,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -4447,6 +4460,7 @@
         },
         "34 Targets": {
             "Computation_Time": 294.59,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -4594,6 +4608,7 @@
         },
         "59 Targets": {
             "Computation_Time": 505.43,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -4841,6 +4856,7 @@
         },
         "77 Targets": {
             "Computation_Time": 760.67,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -5160,6 +5176,7 @@
         },
         "105 Targets": {
             "Computation_Time": 1611.43,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -5591,6 +5608,7 @@
         },
         "182 Targets": {
             "Computation_Time": 7783.73,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -6333,6 +6351,7 @@
         "Cost": 270607328.89,
         "15 Targets": {
             "Computation_Time": 119.58,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -6404,6 +6423,7 @@
         },
         "34 Targets": {
             "Computation_Time": 304.84,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -6551,6 +6571,7 @@
         },
         "59 Targets": {
             "Computation_Time": 581.62,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -6798,6 +6819,7 @@
         },
         "77 Targets": {
             "Computation_Time": 1200.9,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -7117,6 +7139,7 @@
         },
         "105 Targets": {
             "Computation_Time": 4758.6,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -7548,6 +7571,7 @@
         },
         "182 Targets": {
             "Computation_Time": 29366.19,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -8755,6 +8779,7 @@
         "Cost": 291224211.97,
         "15 Targets": {
             "Computation_Time": 161.14,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -8826,6 +8851,7 @@
         },
         "34 Targets": {
             "Computation_Time": 349.15,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -8973,6 +8999,7 @@
         },
         "59 Targets": {
             "Computation_Time": 574.21,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -9220,6 +9247,7 @@
         },
         "77 Targets": {
             "Computation_Time": 816.76,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -9539,6 +9567,7 @@
         },
         "105 Targets": {
             "Computation_Time": 1407.42,
+            "Duration": 30,
             "Unplanned (%)": [
                 99.38271604938271,
                 99.38271604938271,
@@ -9970,6 +9999,7 @@
         },
         "182 Targets": {
             "Computation_Time": 5588.53,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -10712,6 +10742,7 @@
         "Cost": 303224211.97,
         "15 Targets": {
             "Computation_Time": 151.86,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -10783,6 +10814,7 @@
         },
         "34 Targets": {
             "Computation_Time": 368.37,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -10930,6 +10962,7 @@
         },
         "59 Targets": {
             "Computation_Time": 650.37,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -11177,6 +11210,7 @@
         },
         "77 Targets": {
             "Computation_Time": 1026.32,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -11496,6 +11530,7 @@
         },
         "105 Targets": {
             "Computation_Time": 2908.27,
+            "Duration": 30,
             "Unplanned (%)": [
                 99.38271604938271,
                 99.38271604938271,
@@ -11927,6 +11962,7 @@
         },
         "182 Targets": {
             "Computation_Time": 24324.7,
+            "Duration": 30,
             "Unplanned (%)": [
                 99.38271604938271,
                 99.38271604938271,
@@ -13134,6 +13170,7 @@
         "Cost": 319443713.72,
         "15 Targets": {
             "Computation_Time": 158.85,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -13205,6 +13242,7 @@
         },
         "34 Targets": {
             "Computation_Time": 383.62,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -13352,6 +13390,7 @@
         },
         "59 Targets": {
             "Computation_Time": 628.86,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -13599,6 +13638,7 @@
         },
         "77 Targets": {
             "Computation_Time": 868.9,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -13918,6 +13958,7 @@
         },
         "105 Targets": {
             "Computation_Time": 1435.19,
+            "Duration": 30,
             "Unplanned (%)": [
                 99.38271604938271,
                 99.38271604938271,
@@ -14349,6 +14390,7 @@
         },
         "182 Targets": {
             "Computation_Time": 5553.0,
+            "Duration": 30,
             "Unplanned (%)": [
                 99.38271604938271,
                 99.38271604938271,
@@ -15091,6 +15133,7 @@
         "Cost": 323480502.17,
         "15 Targets": {
             "Computation_Time": 169.46,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -15162,6 +15205,7 @@
         },
         "34 Targets": {
             "Computation_Time": 413.23,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -15309,6 +15353,7 @@
         },
         "59 Targets": {
             "Computation_Time": 713.68,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -15556,6 +15601,7 @@
         },
         "77 Targets": {
             "Computation_Time": 1016.2,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -15875,6 +15921,7 @@
         },
         "105 Targets": {
             "Computation_Time": 2194.81,
+            "Duration": 30,
             "Unplanned (%)": [
                 99.38271604938271,
                 99.38271604938271,
@@ -16306,6 +16353,7 @@
         },
         "182 Targets": {
             "Computation_Time": 23684.62,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -17048,6 +17096,7 @@
         "Cost": 339161471.73,
         "15 Targets": {
             "Computation_Time": 183.02,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -17119,6 +17168,7 @@
         },
         "34 Targets": {
             "Computation_Time": 462.01,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -17266,6 +17316,7 @@
         },
         "59 Targets": {
             "Computation_Time": 747.03,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -17513,6 +17564,7 @@
         },
         "77 Targets": {
             "Computation_Time": 1158.46,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
@@ -17832,6 +17884,7 @@
         },
         "105 Targets": {
             "Computation_Time": 1628.63,
+            "Duration": 30,
             "Unplanned (%)": [
                 99.38271604938271,
                 99.38271604938271,
@@ -18263,6 +18316,7 @@
         },
         "182 Targets": {
             "Computation_Time": 12662.66,
+            "Duration": 30,
             "Unplanned (%)": [
                 100.0,
                 100.0,
