@@ -216,6 +216,8 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_list=[15,34]):
     execute = len(pareto_designs)*[False]
     execute[design_idx] = True
 
+    results = []
+
     for idx,design in pareto_designs.iterrows():
         ind = design.tolist()[:6]
         
@@ -226,31 +228,51 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_list=[15,34]):
 
         for tar_num in tar_list:
             if execute[idx]:
-                new_df[f'{ind}'][f'{tar_num} Targets'] = {}
-                stk_object.Target_Loader(f"../../Input_Files/Target_Packages/Targets_{tar_num}.txt")
-                
-                t1 = time.time()
-                Load_Individual(ind)
-                stk_object.Satellite_Loader("../../Input_Files/Satellites_File.txt")
-                
-                stk_object.Generate_Pre_Planning_Data()
-                # stk_object.Plan(enable_print=True)
-                stk_object.Plan_Mixed_Sorting()
+                try:
+                    previous_planned_percentage = np.average(new_df[f'{ind}'][f'{tar_num} Targets']['Planned (%)'])
+                except:
+                    previous_planned_percentage = 0
+                print(f"(Design,Target,Previous(%)) = ({idx},{tar_num},{previous_planned_percentage})")
+                if previous_planned_percentage != 100.0:
+                    try:
+                        previous_duration = new_df[f'{ind}'][f'{tar_num} Targets']['Duration']
+                    except:
+                        previous_duration = 25
 
-                t2 = time.time()
+                    print(f"Duration from {previous_duration} to {previous_duration+5}")
+                    stk_object.set_sim_time(days=previous_duration+5)
+                    new_df[f'{ind}'][f'{tar_num} Targets'] = {}
+                    stk_object.Target_Loader(f"../../Input_Files/Target_Packages/Targets_{tar_num}.txt")
+                    
+                    t1 = time.time()
+                    Load_Individual(ind)
+                    stk_object.Satellite_Loader("../../Input_Files/Satellites_File.txt")
+                    
+                    stk_object.Generate_Pre_Planning_Data()
+                    # stk_object.Plan(enable_print=True)
+                    stk_object.Plan_Mixed_Sorting()
 
-                if np.average([np.count_nonzero(stk_object.target_bins[tar_num])/324*100 for tar_num in range(len(stk_object.targets))]) == 100:
-                    stk_object.hundred = True
+                    t2 = time.time()
+
+                    if np.average([np.count_nonzero(stk_object.target_bins[tar_num])/324*100 for tar_num in range(len(stk_object.targets))]) == 100:
+                        stk_object.hundred = True
+                    else:
+                        stk_object.hundred = False
+                    stk_object.Create_Data_Comparison_df()
+                    df = stk_object.data_comparison
+                    new_df[f'{ind}'][f'{tar_num} Targets']['Computation_Time'] = round(t2-t1,2)
+                    new_df[f'{ind}'][f'{tar_num} Targets']['Duration'] = stk_object.root.CurrentScenario.StopTime/86400
+                    for key in ['Unplanned (%)', 'Unplanned (Time)', 'Planned (%)', 'Planned (Time)']:
+                        new_df[f'{ind}'][f'{tar_num} Targets'][key] = df[key].to_list()
+                    print("Final Planning (%):",np.average(new_df[f'{ind}'][f'{tar_num} Targets']['Planned (%)']))
+                    results.append(np.average(new_df[f'{ind}'][f'{tar_num} Targets']['Planned (%)'])==100)
                 else:
-                    stk_object.hundred = False
-                stk_object.Create_Data_Comparison_df()
-                df = stk_object.data_comparison
-                new_df[f'{ind}'][f'{tar_num} Targets']['Computation_Time'] = round(t2-t1,2)
-                for key in ['Unplanned (%)', 'Unplanned (Time)', 'Planned (%)', 'Planned (Time)']:
-                    new_df[f'{ind}'][f'{tar_num} Targets'][key] = df[key].to_list()
+                    results.append(True)
 
     with open('../../Output_Files/pareto_performance.json', "w") as json_file:
         json.dump(new_df,json_file,indent=4)
+
+    return np.array(results)
                 
 
 
