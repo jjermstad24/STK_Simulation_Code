@@ -248,11 +248,13 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_list=[15,34]):
                 if previous_planned_percentage != 100.0:
                     try:
                         previous_duration = new_df[f'{ind}'][f'{tar_num} Targets']['Duration']
+                        stk_object.set_sim_time(days=previous_duration+5)
+                        print(f"Duration from {previous_duration} days to {previous_duration+5} days")
                     except:
-                        previous_duration = 25
+                        stk_object.set_sim_time(days=30)
+                        print(f"Duration set to 30 days")
 
-                    print(f"Duration from {previous_duration} to {previous_duration+5}")
-                    stk_object.set_sim_time(days=previous_duration+5)
+                    
                     new_df[f'{ind}'][f'{tar_num} Targets'] = {}
                     stk_object.Target_Loader(f"../../Input_Files/Target_Packages/Targets_{tar_num}.txt")
                     
@@ -261,8 +263,7 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_list=[15,34]):
                     stk_object.Satellite_Loader("../../Input_Files/Satellites_File.txt")
                     
                     stk_object.Generate_Pre_Planning_Data()
-                    # stk_object.Plan(enable_print=True)
-                    stk_object.Plan_Mixed_Sorting()
+                    stk_object.Plan()
 
                     t2 = time.time()
 
