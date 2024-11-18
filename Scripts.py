@@ -55,38 +55,47 @@ def find_range_for_data_point(data_point, bounds):
             return i
 
 def check_manueverability(previous_times,
-                          previous_dtheta,
+                          previous_uvec,
                           new_time,
-                          new_dtheta,
-                          slew_rate):
-
+                          new_uvec,
+                          slew_rate,
+                          cone_angle):
+    
     if len(previous_times) > 0:
 
         # Calculate time differences
         d_time = np.abs(new_time - previous_times)
 
+        d_theta = np.abs(np.degrees(np.arccos(np.round(np.einsum('ij,j->i', previous_uvec.T, new_uvec),4))))-cone_angle
+        d_theta = np.maximum(d_theta, 0)
+
         # Return maneuverability condition, ensuring no division by zero
-        ratio = np.divide(previous_dtheta + new_dtheta, d_time,
+        ratio = np.divide(d_theta, d_time,
                           out=np.full_like(d_time, 10),
                           where=d_time != 0)
         
-        return ratio <= slew_rate
+        return (ratio <= slew_rate)|((ratio==10)&(d_theta==0))
 
     # Simplified handling for edge cases when there are no previous times
-    return [[slew_rate > 0 or (slew_rate == 0 and new_dtheta == 0)]]
+    return [[True]]
 
-def get_best_available_access(satellite_specific_plan_per_bound,sat_bounds,bin_access_points,slew_rate):
+def get_best_available_access(satellite_specific_plan_per_bound,sat_bounds,bin_access_points,slew_rate,cone_angle):
     if len(bin_access_points)>0:
         for point in bin_access_points:
-            sat_num = int(point[2])
+            sat_num = int(point[-1])
             bounds = sat_bounds[sat_num]
             bound_idx = find_range_for_data_point(point[0],bounds)
             previous_sat_accesses = satellite_specific_plan_per_bound[sat_num][bound_idx]        
             feasible = check_manueverability(np.array(previous_sat_accesses["Time"]),
-                                             np.array(previous_sat_accesses["dTheta"]),
+                                             np.array([previous_sat_accesses["x"],
+                                                       previous_sat_accesses["y"],
+                                                       previous_sat_accesses["z"]]),
                                              point[0],
-                                             point[1],
-                                             slew_rate)
+                                             np.array([point[1],
+                                                       point[2],
+                                                       point[3]]),
+                                             slew_rate,
+                                             cone_angle)
             
             if np.all(feasible):
                 return point,bound_idx
