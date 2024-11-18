@@ -13,10 +13,9 @@ stk_object.opt = False
 
 stk_object.dt = 5
 
-idx = 15
+stk_object.set_sim_time(days=30)
 
-while True:
-    results = Update_Pareto_Performance(stk_object,idx,tar_list=[15,34,59,77,105,182])
-    print(results)
-    if np.all(results == True):
-        break
+idx = 0
+
+for tar_num in [105,182,481]:
+    result = Update_Pareto_Performance(stk_object,idx,tar_num)

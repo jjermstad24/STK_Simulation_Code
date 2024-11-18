@@ -222,77 +222,50 @@ def Load_Individual(Individual=[0,0,0,0,0,0]):
         i+=1
     file.close()
     
-def Update_Pareto_Performance(stk_object,design_idx,tar_list=[15,34]):
+def Update_Pareto_Performance(stk_object,design_idx,tar_num):
+
     pareto_designs = pd.read_csv("../../Output_Files/pareto.csv")
 
     with open('../../Output_Files/pareto_performance.json', "r") as json_file:
         design_evaluations = json.load(json_file)
 
-    new_df = {}
+    ind = pareto_designs.iloc[design_idx].tolist()[:6]
 
-    execute = len(pareto_designs)*[False]
-    execute[design_idx] = True
+    try:
+        previous_planned_percentage = np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (%)'])
+        previous_planned_time = np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (Time)'])
+    except:
+        previous_planned_percentage = 0
+        previous_planned_time = 1000
 
-    results = []
-
-    for idx,design in pareto_designs.iterrows():
-        ind = design.tolist()[:6]
-        
-        if not(f'{ind}' in design_evaluations.keys()):
-            new_df[f'{ind}'] = {"Cost":design.iloc[8]}
-        else:
-            new_df[f'{ind}'] = design_evaluations[f'{ind}']
-
-        for tar_num in tar_list:
-            if execute[idx]:
-                try:
-                    previous_planned_percentage = np.average(new_df[f'{ind}'][f'{tar_num} Targets']['Planned (%)'])
-                except:
-                    previous_planned_percentage = 0
-                
-                for _ in range(44):print("-",end="")
-                print("")
-                print(f"(Design,Target,Previous(%)) = ({idx},{tar_num},{previous_planned_percentage:.2f})")
-
-                if previous_planned_percentage != 100.0:
-                    try:
-                        previous_duration = new_df[f'{ind}'][f'{tar_num} Targets']['Duration']
-                        stk_object.set_sim_time(days=previous_duration+5)
-                        print(f"Duration from {previous_duration} days to {previous_duration+5} days")
-                    except:
-                        stk_object.set_sim_time(days=30)
-                        print(f"Duration set to 30 days")
-
+    stk_object.Target_Loader(f"../../Input_Files/Target_Packages/Targets_{tar_num}.txt")
                     
-                    new_df[f'{ind}'][f'{tar_num} Targets'] = {}
-                    stk_object.Target_Loader(f"../../Input_Files/Target_Packages/Targets_{tar_num}.txt")
-                    
-                    t1 = time.time()
-                    Load_Individual(ind)
-                    stk_object.Satellite_Loader("../../Input_Files/Satellites_File.txt")
-                    
-                    stk_object.Generate_Pre_Planning_Data()
-                    stk_object.Plan()
+    t1 = time.time()
+    Load_Individual(ind)
+    stk_object.Satellite_Loader("../../Input_Files/Satellites_File.txt")
 
-                    t2 = time.time()
+    stk_object.Generate_Pre_Planning_Data()
+    stk_object.Plan()
 
-                    if np.average([np.count_nonzero(stk_object.target_bins[tar_num])/324*100 for tar_num in range(len(stk_object.targets))]) == 100:
-                        stk_object.hundred = True
-                    else:
-                        stk_object.hundred = False
-                    stk_object.Create_Data_Comparison_df()
-                    df = stk_object.data_comparison
-                    new_df[f'{ind}'][f'{tar_num} Targets']['Computation_Time'] = round(t2-t1,2)
-                    new_df[f'{ind}'][f'{tar_num} Targets']['Duration'] = stk_object.root.CurrentScenario.StopTime/86400
-                    for key in ['Unplanned (%)', 'Unplanned (Time)', 'Planned (%)', 'Planned (Time)']:
-                        new_df[f'{ind}'][f'{tar_num} Targets'][key] = df[key].to_list()
-                    print("Final Planning (%):",np.average(new_df[f'{ind}'][f'{tar_num} Targets']['Planned (%)']))
-                    results.append(np.average(new_df[f'{ind}'][f'{tar_num} Targets']['Planned (%)'])==100)
-                else:
-                    results.append(True)
+    t2 = time.time()
 
-    with open('../../Output_Files/pareto_performance.json', "w") as json_file:
-        json.dump(new_df,json_file,indent=4)
+    if np.average([np.count_nonzero(stk_object.target_bins[tar_num])/324*100 for tar_num in range(len(stk_object.targets))]) == 100:
+        stk_object.hundred = True
+    else:
+        stk_object.hundred = False
+    stk_object.Create_Data_Comparison_df()
+    df = stk_object.data_comparison
+
+    if (df['Planned (%)'].mean() > previous_planned_percentage) or (df['Planned (%)'].mean()==previous_planned_percentage and df['Planned (Time)'].mean() < previous_planned_time):
+        design_evaluations[f'{ind}'][f'{tar_num} Targets']['Computation_Time'] = round(t2-t1,2)
+        design_evaluations[f'{ind}'][f'{tar_num} Targets']['Duration'] = stk_object.root.CurrentScenario.StopTime/86400
+        for key in ['Unplanned (%)', 'Unplanned (Time)', 'Planned (%)', 'Planned (Time)']:
+            design_evaluations[f'{ind}'][f'{tar_num} Targets'][key] = df[key].to_list()
+        print("Final Planning (%):",np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (%)']))
+        print("Final Planning (Time):",np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (Time)']))
+        with open('../../Output_Files/pareto_performance.json', "w") as json_file:
+            json.dump(design_evaluations,json_file,indent=4)
+    return np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (%)'])==100
 
     return np.array(results)
                 
