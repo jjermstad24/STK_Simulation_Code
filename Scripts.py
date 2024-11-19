@@ -230,6 +230,7 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_num):
         design_evaluations = json.load(json_file)
 
     ind = pareto_designs.iloc[design_idx].tolist()[:6]
+    ind = [float(i) for i in ind]
 
     try:
         previous_planned_percentage = np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (%)'])
@@ -256,6 +257,11 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_num):
     stk_object.Create_Data_Comparison_df()
     df = stk_object.data_comparison
 
+    try:
+        design_evaluations[f'{ind}'][f'{tar_num} Targets']['Computation_Time']
+    except:
+        design_evaluations[f'{ind}'][f'{tar_num} Targets'] = {}
+
     if (df['Planned (%)'].mean() > previous_planned_percentage) or (df['Planned (%)'].mean()==previous_planned_percentage and df['Planned (Time)'].mean() < previous_planned_time):
         design_evaluations[f'{ind}'][f'{tar_num} Targets']['Computation_Time'] = round(t2-t1,2)
         design_evaluations[f'{ind}'][f'{tar_num} Targets']['Duration'] = stk_object.root.CurrentScenario.StopTime/86400
@@ -266,8 +272,6 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_num):
         with open('../../Output_Files/pareto_performance.json', "w") as json_file:
             json.dump(design_evaluations,json_file,indent=4)
     return np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (%)'])==100
-
-    return np.array(results)
                 
 def json_to_html(json_data, output_file="json_viewer.html"):
     # HTML template with JavaScript and CSS for collapsible keys
