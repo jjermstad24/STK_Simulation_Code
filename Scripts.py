@@ -262,16 +262,14 @@ def Update_Pareto_Performance(stk_object,design_idx,tar_num):
     except:
         design_evaluations[f'{ind}'][f'{tar_num} Targets'] = {}
 
-    if (df['Planned (%)'].mean() > previous_planned_percentage) or (df['Planned (%)'].mean()==previous_planned_percentage and df['Planned (Time)'].mean() < previous_planned_time):
-        design_evaluations[f'{ind}'][f'{tar_num} Targets']['Computation_Time'] = round(t2-t1,2)
-        design_evaluations[f'{ind}'][f'{tar_num} Targets']['Duration'] = stk_object.root.CurrentScenario.StopTime/86400
-        for key in ['Unplanned (%)', 'Unplanned (Time)', 'Planned (%)', 'Planned (Time)']:
-            design_evaluations[f'{ind}'][f'{tar_num} Targets'][key] = df[key].to_list()
-        print("Final Planning (%):",np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (%)']))
-        print("Final Planning (Time):",np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (Time)']))
-        with open('../../Output_Files/pareto_performance.json', "w") as json_file:
-            json.dump(design_evaluations,json_file,indent=4)
-    return np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (%)'])==100
+    design_evaluations[f'{ind}'][f'{tar_num} Targets']['Computation_Time'] = round(t2-t1,2)
+    design_evaluations[f'{ind}'][f'{tar_num} Targets']['Duration'] = stk_object.root.CurrentScenario.StopTime/86400
+    for key in ['Unplanned (%)', 'Unplanned (Time)', 'Planned (%)', 'Planned (Time)']:
+        design_evaluations[f'{ind}'][f'{tar_num} Targets'][key] = df[key].to_list()
+    print("Final Planning (%):",np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (%)']))
+    print("Final Planning (Time):",np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (Time)']))
+    with open('../../Output_Files/pareto_performance.json', "w") as json_file:
+        json.dump(design_evaluations,json_file,indent=4)
                 
 def json_to_html(json_data, output_file="json_viewer.html"):
     # HTML template with JavaScript and CSS for collapsible keys
