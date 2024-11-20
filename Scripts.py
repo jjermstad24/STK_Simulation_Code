@@ -1,12 +1,11 @@
 import random
-import decimal
 import numpy as np
 import pandas as pd
 import datetime
-from faker import Faker
 from shapely.geometry import Polygon, Point
 import plotly.graph_objects as go
 import plotly.express as px
+from plotly.subplots import make_subplots
 import os, sys
 import plotly.offline
 from dataclasses import dataclass, field
@@ -17,28 +16,9 @@ from deap import creator
 from deap import tools
 from IPython.display import clear_output
 import scipy.interpolate as interpolate
+import json
+import gc
 import time
-import pointpats
-
-def Random_Decimal(t):
-    lower,upper = t
-    return float(decimal.Decimal(random.randrange(lower*10000,upper*10000))/10000)
-
-def Print_Spacing(len=100):
-    for i in range(len):
-        print("-",end="")
-    print()
-
-def Sun_Synchronous_Orbit(revolutions):
-    mu = 398600.44
-    J2 = 1.08262668*10**-3
-    Re = 6378
-    RAAN_Rate_SS = 1.99096871*10**-7
-    Tsid = 86164
-    period = np.pi*2*Tsid/revolutions/(2*np.pi-RAAN_Rate_SS*Tsid)
-    altitude = (mu*(period/2/np.pi)**2)**(1/3)-Re
-    inclination = np.degrees(np.arccos(-2*RAAN_Rate_SS*((Re+altitude)**7/mu)**0.5/(3*J2*Re**2)))
-    return altitude,inclination
 
 def time_convert(date):
     fmt = "%d %b %Y %H:%M:%S.%f"
@@ -48,204 +28,347 @@ def time_convert(date):
         t = datetime.datetime.strptime(date, fmt)
     return pd.Timestamp(year=t.year, month=t.month, day=t.day, hour = t.hour, minute = t.minute ,second=t.second, microsecond=t.microsecond)
 
-def Create_Poly(filename):
-    df = pd.read_csv(filename)
-    l = []
-    for i in range(len(df)):
-        l.append((df['Lat'][i],df['Lon'][i]))
-    return Polygon(l)
+def get_ind(n_planes):
+    df = pd.read_csv(f"../../Output_Files/pareto.csv")
+    df = df[df['Num_Planes'] == n_planes]
+    if len(df) > 0:
+        df = df.sort_values(by='Avg_Time')
+        df = df.reset_index(drop=True)
+        df = df[df.columns[:6]]
+        return df.iloc[0].to_list()
+    else:
+        return 0
 
-def polygon_random_points (poly, num_points,targets_filename):
-    points = pointpats.random.poisson(poly, size=num_points)
-    return pd.DataFrame({'Lat':points[:,1],'Lon':points[:,0]}).dropna().to_csv(targets_filename,index=False)
+def Interpolate(time,az,el):
+    times = np.arange(time[0],time[-1],2.5)
+    if max(el)>=60 and len(time)>3:
+        az_t = interpolate.interpn(points=[time],values=np.array([np.unwrap(az,period=360)]).T,xi=times,method='pchip')[:,0]%360
+        el_t = interpolate.interp1d(x=time,y=[el],kind='cubic')(times)[0]
+    else:
+        ans = interpolate.interp1d(x=time,y=[np.unwrap(az,period=360),el],kind='quadratic')(times).T
+        az_t = ans[:,0]%360;el_t = ans[:,1]
+    return times,az_t,el_t
 
-def plot_targets_and_polygon(poly,filename):
-    df = pd.read_csv(filename)
-    fig = go.Figure(go.Scattermapbox(
-        mode = "markers",
-        lon = df['Lon'],
-        lat = df['Lat'],
-        marker = {'size': 10}))
+def find_range_for_data_point(data_point, bounds):
+    for i, (lower_bound, upper_bound) in enumerate(bounds):
+        if lower_bound <= data_point <= upper_bound:
+            return i
 
-    fig.add_trace(go.Scattermapbox(
-        mode = "lines",
-        lon = np.array(poly.exterior.coords.xy)[0],
-        lat = np.array(poly.exterior.coords.xy)[1],
-        marker = {'size': 10}))
-
-    fig.update_layout(
-        margin ={'l':0,'t':0,'b':0,'r':0},
-        mapbox = {
-            'center': {'lon': 0, 'lat': 0},
-            'style': "open-street-map",
-            'center': {'lon': 0, 'lat': 0},
-            'zoom': 0})
-    return fig
-
-def Pointing_File_Generator(filename,period):
-    f = open(filename,"w")
-    f.write("stk.v.12.1.1\nBegin\tAttitude\nNumberofAttitudePoints\t162\nSequence\t323\nRepeatPattern\n")
-    for i in range(162):
-        f.write(f'{period/162*(i+1)} {(i%9+1)*10-5} {(i//9+1)*10-5}\n')
-    f.write('End Attitude')
-    f.close()
-class Optimizer:
-    def __init__(self,stk_object,n_pop,n_gen,n_sats):
-        self.stk_object = stk_object
-        self.n_pop = n_pop
-        self.n_gen = n_gen
-        self.n_sats = n_sats
-        creator.create("FitnessMax", base.Fitness, weights=(7.0,-1.0,-2.0))
-        creator.create("Satellite", list, fitness=creator.FitnessMax)
-        self.lower = [575,0,0,1,1]
-        self.upper = [630,180,180,self.n_sats,self.n_sats]
-
-        # Registering variables to the satellite
-        self.toolbox = base.Toolbox()
-        self.toolbox.register("attr_alt", random.randint, self.lower[0], self.upper[0])
-        self.toolbox.register("attr_inc", random.randint, self.lower[1], self.upper[1])
-        self.toolbox.register("attr_aop", random.randint, self.lower[2], self.upper[2])
-        self.toolbox.register("attr_num_planes", random.randint, self.lower[3], self.upper[3])
-        self.toolbox.register("attr_sat_per_plane", random.randint, self.lower[4], self.upper[4])
-
-        # Registering satellite to the model
-        self.toolbox.register("satellite", tools.initCycle, creator.Satellite,
-                        (self.toolbox.attr_alt,
-                        self.toolbox.attr_inc,
-                        self.toolbox.attr_aop,
-                        self.toolbox.attr_num_planes,
-                        self.toolbox.attr_sat_per_plane), n=1)
-
-        # Registering tools for the algorithm
-        self.toolbox.register("population", tools.initRepeat, list, self.toolbox.satellite)
-        self.toolbox.register("evaluate", self.cost_function)
-        self.toolbox.register("mate", tools.cxSimulatedBinaryBounded,eta=0.75,low=[x for x in self.lower],up=[x for x in self.upper])
-        self.toolbox.register("mutate", tools.mutUniformInt, low=[x for x in self.lower],up=[x for x in self.upper], indpb=0.3)
-        self.toolbox.register("select", tools.selTournament, tournsize=3)
-        self.stats = tools.Statistics(key=lambda ind: ind.fitness.values)
-        self.stats.register("avg", np.mean, axis=0)
-        self.stats.register("std", np.std, axis=0)
-        self.stats.register("min", np.min, axis=0)
-        self.stats.register("max", np.max, axis=0)
-
-    def run(self):
-        self.fits = []
-        CXPB = 0.7;MUTPB=0.3
-        clear_output(wait=False)
-        g = 0
-        # Creating a population to evolve
-        pop = self.toolbox.population(n=self.n_pop)
-        print("-- Generation %i --" % g)
-        fitnesses = list(map(self.toolbox.evaluate, pop))
-        for ind, fit in zip(pop, fitnesses):
-            ind.fitness.values = fit
-        hof = tools.HallOfFame(5)
-        hof.update(pop)
-
-        percent = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
-        time = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
-        sats = {"Gen":[],"avg":[],"std":[],"min":[],"max":[]}
-
-        self.fits.append([ind.fitness.values for ind in pop])
-        record = self.stats.compile(pop)
-        print(pd.DataFrame(record))
-        for idx,df in enumerate([percent,time,sats]):
-            df['Gen'].append(g)
-            df['avg'].append(record['avg'][idx])
-            df['std'].append(record['std'][idx])
-            df['min'].append(record['min'][idx])
-            df['max'].append(record['max'][idx])
-
-        # Begin the evolution
-        while g < self.n_gen:
-            # clear_output(wait=True)
-            g = g + 1
-            print("-- Generation %i --" % g)
-            # A new generation
-            # Select the next generation individuals
-            offspring = self.toolbox.select(pop, len(pop))
-            # Clone the selected individuals
-            offspring = list(map(self.toolbox.clone, offspring))
-            # Apply crossover and mutation on the offspring
-            for child1, child2 in zip(offspring[::2], offspring[1::2]):
-                if random.random() < CXPB:
-                    self.toolbox.mate(child1, child2)
-                    del child1.fitness.values
-                    del child2.fitness.values
-
-            for mutant in offspring:
-                if random.random() < MUTPB:
-                    self.toolbox.mutate(mutant)
-                    del mutant.fitness.values
-            # Evaluate the individuals with an invalid fitness
-            invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-            fitnesses = map(self.toolbox.evaluate, invalid_ind)
-
-            for ind, fit in zip(invalid_ind, fitnesses):
-                ind.fitness.values = fit
-            pop[:] = offspring
-            hof.update(pop)
-
-            self.fits.append([ind.fitness.values for ind in pop])
-            record = self.stats.compile(pop)
-            print(pd.DataFrame(record))
-            for idx,df in enumerate([percent,time,sats]):
-                df['Gen'].append(g)
-                df['avg'].append(record['avg'][idx])
-                df['std'].append(record['std'][idx])
-                df['min'].append(record['min'][idx])
-                df['max'].append(record['max'][idx])
-        print("------------------------------------------------------------------------")
-        return hof,percent,time,sats
+def check_manueverability(previous_times,
+                          previous_uvec,
+                          new_time,
+                          new_uvec,
+                          slew_rate,
+                          cone_angle):
     
-    def cost_function(self,Individual=[0,0,0,0,0],write=True):
-        Alt = Individual[0]
-        Inc = Individual[1]
-        Aop = Individual[2]
-        num_sats = int(Individual[3])
-        num_planes = int(Individual[4])
-        if num_planes <= num_sats:
-            if write:
-                file = open("Input_Files/Satellites_File.txt","w")
-                file.write("Per,Apo,Inc,AoP,Asc,Loc,Tar\n")
-                sats = num_sats*[1]
-                planes = np.array_split(sats,num_planes)
-                Asc = 0
-                for plane in planes:
-                    Loc = 0
-                    for sat in plane:
-                        file.write(f"{Alt},{Alt},{Inc},{Aop},{round(Asc,4)},{round(Loc,4)},{1}\n")
-                        if len(plane)>1: Loc += 360/(len(plane)-1)
-                    if len(planes)>1:Asc += 180/(len(planes)-1)
-                file.close()
-            satellites_filename = 'Input_Files/Satellites_File.txt'
-            self.stk_object.Satellite_Loader(satellites_filename)
-            print("------------------------------------------------------------------------")
-            self.stk_object.Compute_AzEl()
-            percentages = [100*np.count_nonzero(self.stk_object.target_bins[idx])/324 for idx in range(len(self.stk_object.targets))]
-            times = [self.stk_object.target_times[idx]/86400 for idx in range(len(self.stk_object.targets))]
-            return np.average(percentages),np.max(times),len(self.stk_object.satellites)
-        else:
-            return 0,self.stk_object.root.CurrentScenario.StopTime/86400,12
-        
-class Interval:
-    def __init__(self,access_point,target_number,satellite_number,Interpolate=True):
-        self.start = access_point[0,0]
-        self.stop = access_point[-1,0]
-        self.target_number = target_number
-        self.satellite_number = satellite_number
-        if Interpolate:
-            times = np.arange(self.start,self.stop,2.5)
-            if max(access_point[:,2])>=60 and len(access_point[:,0])>3:
-                az_t = interpolate.interpn(points=[access_point[:,0]],values=np.array([np.unwrap(access_point[:,1],period=360)]).T,xi=times,method='pchip')[:,0]%360
-                el_t = interpolate.interp1d(x=access_point[:,0],y=[access_point[:,2]],kind='cubic')(times)[0]
-            else:
-                ans = interpolate.interp1d(x=access_point[:,0],y=[np.unwrap(access_point[:,1],period=360),access_point[:,2]],kind='quadratic')(times).T
-                az_t = ans[:,0]%360;el_t = ans[:,1]
-            
-            self.bins = np.unique([int(az//10)*9+int(el//10) for az,el in zip(az_t,el_t)])
-        else:
-            self.bins = np.unique([int(az//10)*9+int(el//10) for az,el in zip(access_point[:,1],access_point[:,2])])
+    if len(previous_times) > 0:
 
-    def __repr__(self) -> str:
-        return f"Time: {self.start:.2f}->{self.stop:.2f}\nBins: {self.bins}"                            
+        # Calculate time differences
+        d_time = np.abs(new_time - previous_times)
+
+        d_theta = np.abs(np.degrees(np.arccos(np.round(np.einsum('ij,j->i', previous_uvec.T, new_uvec),4))))-cone_angle
+        d_theta = np.maximum(d_theta, 0)
+
+        # Return maneuverability condition, ensuring no division by zero
+        ratio = np.divide(d_theta, d_time,
+                          out=np.full_like(d_time, 10),
+                          where=d_time != 0)
+        
+        return (ratio <= slew_rate)|((ratio==10)&(d_theta==0))
+
+    # Simplified handling for edge cases when there are no previous times
+    return [[True]]
+
+def get_best_available_access(satellite_specific_plan_per_bound,sat_bounds,bin_access_points,slew_rate,cone_angle):
+    if len(bin_access_points)>0:
+        for point in bin_access_points:
+            sat_num = int(point[-1])
+            bounds = sat_bounds[sat_num]
+            bound_idx = find_range_for_data_point(point[0],bounds)
+            previous_sat_accesses = satellite_specific_plan_per_bound[sat_num][bound_idx]        
+            feasible = check_manueverability(np.array(previous_sat_accesses["Time"]),
+                                             np.array([previous_sat_accesses["x"],
+                                                       previous_sat_accesses["y"],
+                                                       previous_sat_accesses["z"]]),
+                                             point[0],
+                                             np.array([point[1],
+                                                       point[2],
+                                                       point[3]]),
+                                             slew_rate,
+                                             cone_angle)
+            
+            if np.all(feasible):
+                return point,bound_idx
+        return False,False
+
+def Generate_Performance_Curve(cost_curve_dicts, curve_type='Optimization', xaxis='Number of Targets', yaxis='Avg_time'):
+    
+    fig = go.Figure()
+    for n_sats, n_sats_df in cost_curve_dicts[curve_type].items():
+        fig.add_trace(go.Scatter(
+            x=n_sats_df[xaxis],
+            y=n_sats_df[yaxis],
+            mode='lines+markers',
+            name=str(n_sats)
+        ))
+
+    fig.add_hline(30, line_dash='dash', line_color='red')
+    fig.add_annotation(x=100, y=32, text='30 Day Constraint', font=dict(color='red', size=15), showarrow=False)
+    fig.update_layout(
+        title=f'{curve_type} {yaxis} vs. {xaxis}',
+        xaxis_title=xaxis,
+        yaxis_title=yaxis,
+        legend_title='Number of Satellites',
+        template='plotly',
+        height=600,
+        width=1000
+    )
+    fig.show()
+
+def send_message_to_discord(message, channel_id = 1203813613903675502,bot_token=32):
+    if len(bot_token) > 10:
+        import discord
+        import nest_asyncio
+        import asyncio
+        nest_asyncio.apply()
+        intents = discord.Intents.default()
+        intents.message_content = True
+        bot = discord.Client(intents=intents)
+        async def send_message_and_exit():
+            channel = bot.get_channel(channel_id)
+            if channel is not None:
+                await channel.send(message)
+            else:
+                print("Channel not found.")
+            await bot.close()
+        @bot.event
+        async def on_ready():
+            await send_message_and_exit()
+            await bot.close()
+        bot.run(bot_token)
+
+def create_pareto(df,objective1='Cost',obj1_type=-1, objective2='Avg_Percentage',obj2_type=1, plot=True,plot_title='Pareto Frontier',xlabel='',ylabel=''):
+
+    if obj1_type < 0:
+        df = df.sort_values(by=objective1,ascending=True,ignore_index = True)
+    else:
+        df = df.sort_values(by=objective1,ascending=False,ignore_index = True)
+
+    objective1_index = df.columns.tolist().index(objective1)
+    objective2_index = df.columns.tolist().index(objective2)
+
+    pareto_frontier = []
+    pareto_frontier = [[df[idx][0] for idx in df.columns.tolist()]]
+
+    for index, row in df[1:].iterrows():
+        point = [row[idx] for idx in df.columns.tolist()]
+        if obj2_type > 0:
+            if point[objective2_index] > pareto_frontier[-1][objective2_index]:
+                if point[objective1_index] == pareto_frontier[-1][objective1_index]:
+                    pareto_frontier.pop(-1)
+                pareto_frontier.append(point)
+        else:
+            if point[objective2_index] < pareto_frontier[-1][objective2_index]:
+                if point[objective1_index] == pareto_frontier[-1][objective1_index]:
+                    pareto_frontier.pop(-1)
+                pareto_frontier.append(point)
+    pareto_frontier = pd.DataFrame(pareto_frontier, columns=df.columns.tolist())
+
+    if plot:
+        fig = make_subplots()
+
+        scatter = go.Scatter(x=df[objective1],y=df[objective2],hovertext=df.apply(lambda row: '<br>'.join([f'{col}: {row[col]}' for col in df.columns]), axis=1),
+                            hoverinfo='text',mode='markers',name='Dominated Designs',marker=dict(size=8))
+    
+        pareto_line = go.Scatter(x=pareto_frontier[objective1],y=pareto_frontier[objective2],hovertext=pareto_frontier.apply(lambda row: '<br>'.join([f'{col}: {row[col]}' for col in pareto_frontier.columns]), axis=1),
+            hoverinfo='text',mode='lines+markers',name='Pareto Frontier',line=dict(color='green'),marker=dict(size=8))
+        
+        fig.add_trace(scatter)
+        fig.add_trace(pareto_line)
+
+        if len(xlabel) == 0:
+            xlabel = objective1
+        if len(ylabel) == 0:
+            ylabel = objective2
+
+        fig.update_layout(title=f'{plot_title}',xaxis_title=f'{xlabel}',yaxis_title=f'{ylabel}',legend=dict(x=1, y=1.25),template='plotly_white')
+        fig.show()
+
+    return pareto_frontier
+    
+def Load_Individual(Individual=[0,0,0,0,0,0]):
+    Alt = Individual[0]
+    Inc = Individual[1]
+    initial_raan = Individual[2]
+    delta_raan = Individual[3]
+    n_planes = int(Individual[5])
+    n_sats = int(Individual[4])
+    
+    if n_planes > n_sats:
+        n_planes = n_sats
+
+    Asc = initial_raan
+    file = open(f"../../Input_Files/Satellites_File.txt","w")
+    file.write("Per,Apo,Inc,Asc,Loc\n")
+    sats = n_sats*[1]
+    planes = np.array_split(sats,n_planes)
+    i=1
+    for plane in planes:
+        Loc = 0
+        for sat in plane:
+            file.write(f"{Alt},{Alt},{Inc},{round(Asc%180,4)},{round(Loc,4)}\n")
+            if len(plane)>1: Loc += 360/len(plane)
+        if len(planes)>1:Asc -= i*((-1)**(i))*delta_raan
+        i+=1
+    file.close()
+    
+def Update_Pareto_Performance(stk_object,design_idx,tar_num):
+
+    pareto_designs = pd.read_csv("../../Output_Files/pareto.csv")
+
+    with open('../../Output_Files/pareto_performance.json', "r") as json_file:
+        design_evaluations = json.load(json_file)
+
+    ind = pareto_designs.iloc[design_idx].tolist()[:6]
+    ind = [float(i) for i in ind]
+
+    try:
+        previous_planned_percentage = np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (%)'])
+        previous_planned_time = np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (Time)'])
+    except:
+        previous_planned_percentage = 0
+        previous_planned_time = 1000
+
+    stk_object.Target_Loader(f"../../Input_Files/Target_Packages/Targets_{tar_num}.txt")
+                    
+    t1 = time.time()
+    Load_Individual(ind)
+    stk_object.Satellite_Loader("../../Input_Files/Satellites_File.txt")
+
+    stk_object.Generate_Pre_Planning_Data()
+    stk_object.Plan()
+
+    t2 = time.time()
+
+    if np.average([np.count_nonzero(stk_object.target_bins[tar_num])/324*100 for tar_num in range(len(stk_object.targets))]) == 100:
+        stk_object.hundred = True
+    else:
+        stk_object.hundred = False
+    stk_object.Create_Data_Comparison_df()
+    df = stk_object.data_comparison
+
+    try:
+        design_evaluations[f'{ind}'][f'{tar_num} Targets']['Computation_Time']
+    except:
+        design_evaluations[f'{ind}'][f'{tar_num} Targets'] = {}
+
+    design_evaluations[f'{ind}'][f'{tar_num} Targets']['Computation_Time'] = round(t2-t1,2)
+    design_evaluations[f'{ind}'][f'{tar_num} Targets']['Duration'] = stk_object.root.CurrentScenario.StopTime/86400
+    for key in ['Unplanned (%)', 'Unplanned (Time)', 'Planned (%)', 'Planned (Time)']:
+        design_evaluations[f'{ind}'][f'{tar_num} Targets'][key] = df[key].to_list()
+    print("Final Planning (%):",np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (%)']))
+    print("Final Planning (Time):",np.average(design_evaluations[f'{ind}'][f'{tar_num} Targets']['Planned (Time)']))
+    with open('../../Output_Files/pareto_performance.json', "w") as json_file:
+        json.dump(design_evaluations,json_file,indent=4)
+                
+def json_to_html(json_data, output_file="json_viewer.html"):
+    # HTML template with JavaScript and CSS for collapsible keys
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>JSON Viewer</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; }}
+            ul {{ list-style-type: none; }}
+            .collapsible {{ cursor: pointer; }}
+            .nested {{ display: none; }}
+            .active {{ display: block; }}
+        </style>
+    </head>
+    <body>
+        <h2>JSON Viewer</h2>
+        <ul id="jsonContainer"></ul>
+        <script>
+            // JSON data as a JavaScript variable
+            const jsonData = {json.dumps(json_data, indent=4)};
+
+            function createTreeView(obj, container) {{
+                for (let key in obj) {{
+                    if (obj.hasOwnProperty(key)) {{
+                        const li = document.createElement("li");
+                        if (typeof obj[key] === 'object' && obj[key] !== null) {{
+                            li.innerHTML = '<span class="collapsible">➕ ' + key + '</span>';
+                            const nestedUl = document.createElement("ul");
+                            nestedUl.classList.add("nested");
+                            createTreeView(obj[key], nestedUl);
+                            li.appendChild(nestedUl);
+                        }} else {{
+                            li.textContent = key + ": " + obj[key];
+                        }}
+                        container.appendChild(li);
+                    }}
+                }}
+            }}
+
+            // Toggle display for collapsible items
+            document.addEventListener("click", function(e) {{
+                if (e.target.classList.contains("collapsible")) {{
+                    e.target.classList.toggle("active");
+                    const content = e.target.nextElementSibling;
+                    if (content) {{
+                        content.classList.toggle("active");
+                        e.target.textContent = e.target.textContent.includes("➕") 
+                            ? e.target.textContent.replace("➕", "➖") 
+                            : e.target.textContent.replace("➖", "➕");
+                    }}
+                }}
+            }});
+
+            // Initialize the JSON viewer
+            const jsonContainer = document.getElementById("jsonContainer");
+            createTreeView(jsonData, jsonContainer);
+        </script>
+    </body>
+    </html>
+    """
+
+    # Write the HTML content to an output file with utf-8 encoding
+    with open(output_file, "w", encoding="utf-8") as file:
+        file.write(html_content)
+
+def Generate_Performance_Curve():
+    with open('../../Output_Files/pareto_performance.json', "r") as json_file:
+        pareto_performance_dict = json.load(json_file)
+    fig = go.Figure()
+    for Individual, design_data in pareto_performance_dict.items():
+        num_targets = [int(targets.split(' ')[0]) for targets in list(design_data.keys())[1:]]
+        times = [np.average(design_data[f'{targets}']['Planned (Time)']) for targets in list(design_data.keys())[1:]]
+        percentages = [np.average(design_data[f'{targets}']['Planned (%)']) for targets in list(design_data.keys())[1:]]
+
+        results_df = pd.DataFrame({'Tar_Num': num_targets, 'Times': times, 'Percentages': percentages})
+        results_df = results_df[results_df['Percentages'] == 100]
+
+        cost = int(design_data['Cost']/1e6)
+        design = pd.DataFrame([Individual[1:-1].split(',')], columns=['Alt','Inc', 'Initial_Raan','Delta_Raan','Num_Sats', 'Num_Planes'])
+        fig.add_trace(go.Scatter(
+            x=results_df['Tar_Num'],
+            y=results_df['Times'],
+            hovertext=design.apply(lambda row: '<br>'.join([f'{col}: {row[col]}' for col in design.columns]), axis=1),
+            hoverinfo='text',
+            mode='lines+markers',
+            name=str(cost)))
+        
+    fig.add_hline(30, line_dash='dash', line_color='red')
+    fig.update_layout(
+        title='Average Time vs. Number of Targets',
+        xaxis_title='Number of Targets',
+        yaxis_title='Average Time',
+        legend_title='Cost [M$]',
+        template='plotly',
+        height=600,
+        width=1000
+    )
+    fig.show()
