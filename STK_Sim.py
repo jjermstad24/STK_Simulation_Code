@@ -60,7 +60,8 @@ class STK_Simulation:
     def Satellite_Loader(self,Filename,External_Pointing_File=False):
         self.satellites = []
         self.radars = []
-        # self.transmitter = []
+        self.transmitters = []
+        self.receivers = []
         for satellite in self.root.CurrentScenario.Children.GetElements(AgESTKObjectType.eSatellite):
             satellite.Unload()
 
@@ -88,6 +89,53 @@ class STK_Simulation:
             self.satellites[-1].Propagator.InitialState.Representation.Assign(keplerian)
             self.satellites[-1].Propagator.Propagate()
 
+            # Assigning a transmitter and transmitter antenna to satellites
+            transmitter = self.satellites[-1].Children.New(AgESTKObjectType.eTransmitter, f"Transmitter_{satellite_num}")
+            #transmitter.SetModel('Complex Transmitter Model')
+            #txModel = transmitter.Model
+            #txModel.Power = 6.0206 # dBW --> log(4) antenna quality
+            #txModel.Frequency = 8.35 # GHz 
+            #txModel.DataRate = 200 # Mb/sec
+
+            #antennaControltx = txModel.AntennaControl
+            #antennaControltx.SetEmbeddedModel('Rectangular Pattern')
+            #antennaControltx.EmbeddedModel.DesignFrequency = 8.35 # GHz
+            #antennaControltx.EmbeddedModel.PhiAngle = 18
+            #antennaControltx.EmbeddedModel.ThetaAngle = 18
+            
+            #txModel.SetModulator('BPSK')
+            #txModel.Modulator.AutoScaleBandwidth = True
+            # txModel.Modulator.Bandwidth = 375 # MHz
+
+            #gain = txModel.PostTransmitGainsLosses.Add(50) # dBi ## 16 max
+            #gain.Identifier = 'Transmitting Gain'
+
+            #txModel.EnablePolarization = True
+            #txModel.SetPolarizationType(2)
+            
+            ################ Assigning a receiver and receiver antenna to satellites
+            
+            receiver = self.satellites[-1].Children.New(AgESTKObjectType.eReceiver, f"Receiver{satellite_num}")
+            #receiver.SetModel('Complex Receiver Model')
+            #recModel = receiver.Model
+            #recModel.AutoTrackFrequency = 7.19 # GHz
+
+            #recModel.EnablePolarization = True
+            #recModel.SetPolarizationType(2)
+            
+            #recModel.LinkMargin.Enable = True
+            #recModel.LinkMargin.Type = 1
+            #recModel.LinkMargin.Threshold = 20 #10.5 # dB
+
+            #antennaControlrx = recModel.AntennaControl
+            #antennaControlrx.SetEmbeddedModel('Rectangular Pattern')
+            #antennaControlrx.EmbeddedModel.DesignFrequency = 7.19 #GHz
+            #antennaControlrx.EmbeddedModel.PhiAngle = 40
+            #antennaControlrx.EmbeddedModel.MainlobeGain = 18 - 2.15 # 18 dBi in datasheet
+
+            #recModel.SetPolarizationType(2)
+
+            
             # IAgSatellite satellite: Satellite object
             # self.radars[satellite_num] = self.satellites[satellite_num].Children.New(AgESTKObjectType.eRadar, f'Radar{i+1}')
             # self.radars[satellite_num].CommonTasks.SetPatternSimpleConic(5, 0.1)
@@ -95,8 +143,9 @@ class STK_Simulation:
             # self.radars[satellite_num].SetPointingType(5)
             # for j in self.targets:
             #     self.radars[satellite_num].Pointing.Targets.Add(f'*/Target/{j}')
-            
-            # self.transmitter.append(transmitter)
+
+            self.transmitters.append(transmitter)
+            self.receivers.append(receiver)
 
     def Reset_Target_Bins(self):
         for idx in range(len(self.targets)):
@@ -155,7 +204,7 @@ class STK_Simulation:
     def Get_Access_DP(self,obs1,obs2,bus_name,Total_Elements=False,enable_print=True):
         dfs = []
         splits = bus_name.split("/")
-        with alive_bar(len(self.satellites)*len(self.targets),force_tty=True,bar='classic',title=f'- Computing_{bus_name}',length=10,disable=not(enable_print)) as bar:
+        with alive_bar(len(obs1)*len(obs2),force_tty=True,bar='classic',title=f'- Computing_{bus_name}',length=10,disable=not(enable_print)) as bar:
             for ob1 in obs1:
                 dfs.append([])
                 for ob2 in obs2:
