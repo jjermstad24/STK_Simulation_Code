@@ -101,9 +101,9 @@ class STK_Simulation:
             #antennaControltx.EmbeddedModel.PhiAngle = 18
             #antennaControltx.EmbeddedModel.ThetaAngle = 18
             
-            txModel.SetModulator('BPSK')
-            txModel.Modulator.AutoScaleBandwidth = False
-            txModel.Modulator.Bandwidth = 375 # MHz
+            #txModel.SetModulator('BPSK')
+            #txModel.Modulator.AutoScaleBandwidth = True
+            # txModel.Modulator.Bandwidth = 375 # MHz
 
             #gain = txModel.PostTransmitGainsLosses.Add(50) # dBi ## 16 max
             #gain.Identifier = 'Transmitting Gain'
@@ -121,9 +121,9 @@ class STK_Simulation:
             #recModel.EnablePolarization = True
             #recModel.SetPolarizationType(2)
             
-            recModel.LinkMargin.Enable = True
-            recModel.LinkMargin.Type = 1
-            recModel.LinkMargin.Threshold = 10.5 # dB
+            #recModel.LinkMargin.Enable = True
+            #recModel.LinkMargin.Type = 1
+            #recModel.LinkMargin.Threshold = 20 #10.5 # dB
 
             #antennaControlrx = recModel.AntennaControl
             #antennaControlrx.SetEmbeddedModel('Rectangular Pattern')
