@@ -194,7 +194,11 @@ class STK_Simulation:
                     bus = sat.DataProviders.GetItemByName(splits[0]).Group.GetItemByName(splits[1])
                 elif len(splits) == 1:
                     bus = sat.DataProviders.GetItemByName(bus_name)
-                df = bus.Exec(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt).DataSets.ToPandasDataFrame()
+                data = np.array(bus.Exec(self.root.CurrentScenario.StartTime,self.root.CurrentScenario.StopTime,self.dt).DataSets.ToArray())
+                df = {}
+                for idx,e in enumerate(bus.Elements):
+                    df[e.Name] = data[:,idx]
+                df = pd.DataFrame(df)
                 for col in df.columns:
                     df[col] = df[col].astype(float,errors='ignore')
                 dfs.append(df)
