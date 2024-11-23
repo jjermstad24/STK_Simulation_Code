@@ -208,6 +208,15 @@ class STK_Simulation:
                 for ob2 in obs2:
                     access = ob1.GetAccessToObject(ob2)
                     access.ComputeAccess()
+                    ## Contact Time Code
+                    # IAgStkAccess access: Access calculation
+                    # Get and display the Computed Access Intervals
+                    intervalCollection = access.ComputedAccessIntervalTimes
+
+                    # Set the intervals to use to the Computed Access Intervals
+                    computedIntervals = intervalCollection.ToArray(0, -1)
+                    access.SpecifyAccessIntervals(computedIntervals)
+                    ##
                     if len(splits) == 2:
                         bus = access.DataProviders.GetItemByName(splits[0]).Group.GetItemByName(splits[1])
                     if len(splits) == 1:
