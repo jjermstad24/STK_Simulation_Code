@@ -235,9 +235,9 @@ class STK_Simulation:
                     bar()
         return dfs
 
-    def Update_Mass_Properties(self,M=250,I=[[288,0,0],
-                                             [0,88.88,0],
-                                             [0,0,288]]):
+    def Update_Mass_Properties(self,M=256,I=[[59,0,0],
+                                             [0,2894,0],
+                                             [0,0,2945]]):
         for sat in self.satellites:
             sat.MassProperties.Mass = M
             sat.MassProperties.Inertia.Ixx = I[0][0]
