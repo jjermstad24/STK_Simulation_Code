@@ -191,7 +191,7 @@ def create_pareto(df,objective1='Cost',obj1_type=-1, objective2='Avg_Percentage'
         if len(ylabel) == 0:
             ylabel = objective2
 
-        fig.update_layout(title=f'{plot_title}',xaxis_title=f'{xlabel}',yaxis_title=f'{ylabel}',legend=dict(x=1, y=1.25),template='plotly_white')
+        fig.update_layout(title=f'{plot_title}',xaxis_title=f'{xlabel}',yaxis_title=f'{ylabel}',legend=dict(x=.5, y=1.25),template='plotly_white')
         fig.show()
 
     return pareto_frontier
